@@ -1,10 +1,11 @@
-# OGRe<sup>TM</sup>: An (O)bject-oriented (G)eneral (Re)lativity (T)oolkit for (M)athematica
+# OGRe: An (O)bject-oriented (G)eneral (Re)lativity Package for Mathematica
 
 <!-- TOC depthFrom:2 -->
 
 - [Summary](#summary)
 - [Features](#features)
 - [Documentation](#documentation)
+- [Version history](#version-history)
 - [Citing](#citing)
 - [Copyright and license](#copyright-and-license)
 
@@ -48,12 +49,36 @@ The full and detailed documentation for this package may be found in the followi
 * `OGRe_Documentation.nb`: An interactive Mathematica notebook. Requires Mathematica to open.
 * `OGRe_Documentation.pdf`: A PDF version of the notebook. Can be viewed with any PDF reader.
 
+<a id="markdown-version-history" name="version-history"></a>
+## Version history
+
+* v1.1 (2021-04-15)
+    * New modules:
+        * `TCheckForUpdates`: Automatically checks the GitHub repository for updates. If a new version of the package is available, the module will offer an option to download or install the new version and reload the package.
+        * `TGetComponents`: Extracts the components of a tensor object in a specific representation as a `List`.
+        * `TInfo`: Displays information about a tensor object, and any other objects associated with it, in human-readable form.
+    * Changes to existing modules:
+        * `TAddCoordTransformation` now also calculates the Jacobian of the transformation when it is executed, and stores the result for future use within the tensor object of the source coordinates. This improves performance by using the pre-calculated Jacobian whenever a coordinate transformation is performed, instead of calculating it from scratch every time, as was the case in v1.0.
+        * `TChristoffel` now explicitly marks the resulting tensor object as having special transformation properties. The Levi-Civita connection, whose components are the Christoffel symbols, does not transform like a tensor under a coordinate transformation, and OGRe now automatically knows to use the correct transformation rule. **Please note that tensors created with `TChristoffel` in v1.0 will not transform correctly, so they should be recalculated after updating.**
+        * `TExport` now adds a key named `"OGReVersion"` which records the version of the package used to create the tensor being exported. This will be used in future versions to ensure backwards compatibility.
+        * `TExportAll` now exports, in addition to all the tensors defined so far, a special key, `Options`, containing information about the current session. Currently, this key stores the version of the package, the index letters to use, and the simplification assumptions set by the user. When importing the data in another session using `TImportAll`, the version number will be used to ensure backwards compatibility, and the other options will be used to restore any user-defined index letters and simplification assumptions made during the session.
+        * `TNewTensor` now allows defining the components of the new tensor in any coordinate system. In v1.0, the components had to be defined in the default coordinate system of the associated metric. This is still the default behavior if a coordinate system is not specified, for compatibility with v1.0, but it is recommended to always specify the coordinate system explicitly, to avoid accidentally defining the tensor with the wrong components.
+        * `TSimplifyAssumptions` now appends new simplification assumptions to the list of previously added  assumptions, instead of replacing it. Also, OGRe now automatically assumes that all variables are real, which helps simplify certain expressions. If you are using more exotic variables, use `TSimplifyAssumptions[!Reals]` to disable this assumption.
+    * Other changes:
+        * The `"Role"` key of each tensor object now indicates how that object was created. In v1.0, tensors created with `TNewCoordinates` had the role `"Coordinates"` and tensors created with `TNewMetric` had the role `"Metric"`, but all other tensors had the role `"General"`. Now tensors will have the roles `"Tensor"`, `"Calculated"`, `"Christoffel"`, `"Riemann"`, `"Ricci Tensor"`, `"Ricci Scalar"`, or `"Einstein"` if they were created using `TNewTensor`, `TCalc`, `TChristoffel`, `TRiemannTensor`, `TRicciTensor`, `TRicciScalar`, or `TEinstein` respectively. This is currently just for bookkeeping, but may have other uses in future versions. Note that tensors imported from v1.0 will still have the role `"General"`.
+        * Improved the formatting of the usage messages for all OGRe modules. They no longer break in the middle of words.
+        * Debug mode has been removed. If the package is loaded more than once in a single session, it will redefine all symbols but keep any previously defined tensors intact. This is useful both for debugging and for reloading the package after an update.
+    * Bug fixes:
+        * Fixed a bug where the partial and covariant derivatives of a scalar were not calculated correctly.
+* v1.0 (2021-02-10)
+    * Initial release.
+
 <a id="markdown-citing" name="citing"></a>
 ## Citing
 
 If you use this package in your research, please cite it as follows:
 
-* Barak Shoshany, OGRe: An Object-Oriented General Relativity Toolkit for Mathematica, [https://github.com/bshoshany/OGRe](https://github.com/bshoshany/OGRe) (2021).
+* Barak Shoshany, OGRe: An Object-oriented General Relativity Package for Mathematica, [https://github.com/bshoshany/OGRe](https://github.com/bshoshany/OGRe) (2021).
 
 (This citation will be replaced with a journal reference once a paper is published.)
 
