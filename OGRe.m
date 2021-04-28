@@ -1,7 +1,7 @@
 (* ::Package:: *)
 
 
-(* OGRe: An (O)bject-oriented (G)eneral (Re)lativity Package for Mathematica *)
+(* OGRe: An (O)bject-Oriented (G)eneral (Re)lativity Package for Mathematica *)
 (*            By Barak Shoshany (baraksh@gmail.com) (baraksh.com)            *)
 (*                     https://github.com/bshoshany/OGRe                     *)
 
@@ -9,43 +9,23 @@
 BeginPackage["OGRe`"];
 
 
-Unprotect[OGRe`Private`OGReVersion];
-(* DO NOT change the format of the next line. It is used by TCheckForUpdates to detect the version of this file. Changing it will break the automatic update mechanism. Only change the version number and date. *)
-OGRe`Private`OGReVersion = "v1.1 (April 15, 2021)";
-
-
-(* Print welcome message. *)
-CellPrint[ExpressionCell[
-    Column[{
-        Row[{"OGRe: An (O)bject-oriented (G)eneral (Re)lativity Package for Mathematica"}],
-        Row[{"By Barak Shoshany (", Hyperlink["baraksh@gmail.com", "mailto:baraksh@gmail.com"], ") (", Hyperlink["baraksh.com", "https://baraksh.com/"], ")"}],
-        Row[{OGRe`Private`OGReVersion}],
-        Row[{"GitHub repository: ", Hyperlink["https://github.com/bshoshany/OGRe"]}],
-        Row[{"To automatically check if a new version is available, type ", Style["TCheckForUpdates[]", "Input"], " or ", Button["click here.", TCheckForUpdates[], BaseStyle -> "Hyperlink", Appearance -> "Frameless"]}],
-        Row[{"To list all available modules, type ", Style["?OGRe`*", "Input"], " or ", Button["click here.", Print[Information["OGRe`*"]], BaseStyle -> "Hyperlink", Appearance -> "Frameless"]}],
-        Row[{"To get help on a particular module, type ", Style["?", "Input"], " followed by the module name."}]
-    }],
-    "Output"]
-];
-
-
 (* Check if the package has already been loaded, in case Get was used instead of Needs. *)
 If[
     ValueQ[OGRe`Private`AlreadyLoaded],
 (* Then *)
-    (* Unprotect and clear all symbols, except TensorData and OGReVersion, so they can be redefined. Useful for debugging, or to reload the package after updating. *)
+    (* Unprotect and clear all symbols, so they can be redefined. Useful for debugging, or to reload the package after updating. *)
     Unprotect["OGRe`*"];
     Unprotect["OGRe`Private`*"];
-    {OGReTemp`TensorData, OGReTemp`OGReVersion} = {OGRe`Private`TensorData, OGRe`Private`OGReVersion};
+    (* Keep the tensor objects and settings created so far during the session, so they don't get deleted when the package is reloaded. *)
+    OGReTemp`TensorData = OGRe`Private`TensorData;
     ClearAll["OGRe`*"];
     ClearAll["OGRe`Private`*"];
-    {OGRe`Private`TensorData, OGRe`Private`OGReVersion} = {OGReTemp`TensorData, OGReTemp`OGReVersion};
+    OGRe`Private`TensorData = OGReTemp`TensorData;
     Remove["OGReTemp`*"];
-    OGRe`Private`AlreadyLoaded = True;
-    Print["Package reloaded."],
+    OGRe`Private`AlreadyLoaded = True,
 (* Else *)
     OGRe`Private`AlreadyLoaded = True;
-    (* Initialize the symbol TensorData, which is used to store the data for the tensor objects. This is done only on first load, since we do not want to delete the defined tensors if the package was reloaded during a session. *)
+    (* Initialize the symbol TensorData, which is used to store the data for the tensor objects, as well as user settings. This is done only on first load. *)
     OGRe`Private`TensorData = Association[];
 ];
 
@@ -62,6 +42,7 @@ Null[{
     TChristoffel,
     TCovariantD,
     TDelete,
+    TDocs,
     TEinsteinTensor,
     TExport,
     TExportAll,
@@ -75,6 +56,7 @@ Null[{
     TNewCoordinates,
     TNewMetric,
     TNewTensor,
+    TParallelize,
     TPartialD,
     TRicciScalar,
     TRicciTensor,
@@ -85,12 +67,53 @@ Null[{
 }];
 
 
-Begin["`Private`"];
+Begin["`Private`"]; (* OGRe`Private` *)
 
 
-(* A special key in TensorData, Options, is used to store information about the current session, for the purpose of exporting and importing between sessions using TExportAll and TImportAll. Since this key is not a string, it cannot be accidentally overwritten by a tensor definition. Currently, this key stores the version of the package, the index letters to use, and the simplification assumptions set by the user. The key will be created on startup and upon importing with TImportAll only if it does not already exist, to allow for consistency when debugging or reloading the package after an update. *)
+(* DO NOT change the format of the next line. It is used by TCheckForUpdates to detect the version of this file. Changing it will break the automatic update mechanism. Only change the version number and date. *)
+OGReVersion = "v1.2 (April 28, 2021)";
+
+
+(* The raw URL of this file on GitHub. *)
+OGReURL = "https://raw.githubusercontent.com/bshoshany/OGRe/master/OGRe.m";
+
+
+(* This module creates a clickable button that looks and behaves like a hyperlink. *)
+CreateButton[label_, action_] := Button[
+    MouseAppearance[Mouseover[
+        Style[label, "Hyperlink"],
+        Style[label, "HyperlinkActive"]
+    ], "LinkHand"],
+    action,
+    Appearance -> "Frameless",
+    BaseStyle -> "Hyperlink"
+];
+Attributes[CreateButton] = HoldRest;
+
+
+(* This module prints an expression in an uneditable cell with the label OGRe. *)
+OGRePrint[expression_] := CellPrint[ExpressionCell[expression, "Output", Editable -> False, CellLabel -> "OGRe:", CellLabelStyle -> Directive["CellLabel", Smaller, Blue]]];
+OGRePrint[expressions__] := OGRePrint[Row[{expressions}]];
+
+
+(* Print a welcome message at startup. *)
+OGRePrint[Column[{
+    Style[Row[{"OGRe: An ", Style["O", Underlined], "bject-Oriented ", Style["G", Underlined], "eneral ", Style["Re", Underlined], "lativity Package for Mathematica"}], Bold, Larger],
+    Style[Row[{"By Barak Shoshany (", Hyperlink["baraksh@gmail.com", "mailto:baraksh@gmail.com"], ") (", Hyperlink["baraksh.com", "https://baraksh.com/"], ")"}], Bold],
+    Style[Row[{OGReVersion}], Bold],
+    Style[Row[{"GitHub repository: ", Hyperlink["https://github.com/bshoshany/OGRe"]}], Bold],
+    Row[{"\[Bullet] To check if a new version is available, type ", Style["TCheckForUpdates[]", "Input"], " or ", CreateButton["click here.", TCheckForUpdates[]]}],
+    Row[{"\[Bullet] To view the full documentation for the package, type ", Style["TDocs[]", "Input"], " or ", CreateButton["click here.", TDocs[]]}],
+    Row[{"\[Bullet] To list all available modules, type ", Style["?OGRe`*", "Input"], " or ", CreateButton["click here.", OGRePrint[Information["OGRe`*"]]]}],
+    Row[{"\[Bullet] To get help on a particular module, type ", Style["?", "Input"], " followed by the module name."}],
+    Row[{"\[Bullet] To enable the new parallelization feature, type ", Style["TParallelize[True]", "Input"], " or ", CreateButton["click here.", TParallelize[True]]}]
+}]];
+
+
+(* A special key in TensorData, Options, is used to store information about the current session, for the purpose of exporting and importing between sessions using TExportAll and TImportAll. Since this key is not a string, it cannot be accidentally overwritten by a tensor definition. *)
 DefaultIndexLetters = "\[Mu]\[Nu]\[Rho]\[Sigma]\[Kappa]\[Lambda]\[Alpha]\[Beta]\[Gamma]\[Delta]\[CurlyEpsilon]\[Zeta]\[Epsilon]\[Theta]\[Iota]\[Xi]\[Pi]\[Tau]\[Phi]\[Chi]\[Psi]\[Omega]";
 PopulateOptions[] := (
+    (* The key will be created on startup only if it does not already exist, to allow for consistency when debugging or reloading the package after an update. It will also be created when using TImportAll if it does not already exist, in case tensors are imported from an earlier version, or the user messed with the data. *)
     If[
         !KeyExistsQ[TensorData, Options],
     (* Then *)
@@ -100,7 +123,8 @@ PopulateOptions[] := (
             "SimplifyAssumptions" -> Association[
                 "AssumeReal" -> True,
                 "User" -> None
-            ]
+            ],
+            "Parallelize" -> False
         ]
     ]
 );
@@ -122,7 +146,6 @@ CreateUsageMessage[f_, args_List, msg_String, additional_List : {}] := Module[
         StandardForm
     ];
 ];
-Attributes[UsageMessage] = HoldAll;
 
 
 (* ===================================================
@@ -229,25 +252,30 @@ CreateUsageMessage[TCalc, {LHSTensorID[LHSIndices], RHSExpression, symbol}, "cal
 `7` specifies the order of indices of the resulting tensor. The indices must be a permutation of the free indices of `2`. If omitted, the indices will be in the same order as they appear in `2`. If `6` is omitted, then `7` must be omitted as well.
 `3` specifies the symbol to use for the result. If omitted, the placeholder symbol " <> DefaultSymbol <> " will be used.", {ID, indices, LHSTensorID, LHSIndices}];
 TCalc::ErrorIndices = "The LHS index specification \"`1`\" and the RHS index specification \"`2`\" must be the same up to permutation.";
-TCalc::ErrorResult = "Invalid tensor expression entered. Tensor expressions may only contain tensor references of the form \"ID\"[\"indices\"] combined using addition, contraction (dot product), or multiplication by scalar."
+TCalc::ErrorResult = "Invalid tensor expression obtained: `1`. Please check that the tensor expression you entered contains only tensor references of the form \"ID\"[\"indices\"] combined using addition, contraction (dot product), or multiplication by scalar."
 TCalc[RHSExpression_, symbol_String : DefaultSymbol] := TCalc[DefaultResultID[""], RHSExpression, symbol];
 TCalc[LHSTensorID_String, RHSExpression_, symbol_String : DefaultSymbol] := TCalc[LHSTensorID[""], RHSExpression, symbol];
 TCalc[LHSTensorID_String[LHSIndices_String], RHSExpression_, symbol_String : DefaultSymbol] := Module[
     {
-        LHSVars,
-        RHSVars,
         allVars,
         components,
+        leafCount,
+        LHSVars,
         newComponents,
         newIndices,
+        progress,
         result,
         resultID,
         resultIndices,
+        RHSVars,
+        rules,
         useCoords,
         useIndices
     },
-    (* Repeatedly replace tensor operations with their results until they have all been calculated. *)
-    result = RHSExpression //. {
+    (* Record the initial leaf count of the expression to be calculated. It will be used to advance the progress bar, since the leaf count decreases with (almost) every operation. *)
+    leafCount = LeafCount[RHSExpression];
+    (* Define the rules for computing tensor formulas. *)
+    rules = {
         (* Trace *)
         ID_String[indices_String /; !DuplicateFreeQ[Characters[indices]]] :>
             TensorTrace[ID[indices]],
@@ -267,11 +295,21 @@ TCalc[LHSTensorID_String[LHSIndices_String], RHSExpression_, symbol_String : Def
         TCovariantD[derivativeIndex_String] . tensorID_String[tensorIndices_String] :>
             CovariantDivOrGrad[derivativeIndex, TensorTrace[tensorID[tensorIndices]]]
     };
+    (* Print a dynamic progress indicator. *)
+    progress = 0;
+    PrintTemporary["Calculation progress: ", ProgressIndicator[Dynamic[progress], {0, 1}]];
+    (* Repeatedly replace tensor operations with their results until we reach a fixed point. Note that we use NestWhile instead of  ReplaceRepeated here so that we can report progress to the user. *)
+    result = NestWhile[(
+        result = ReplaceAll[#, rules];
+        progress = 1 - LeafCount[result] / leafCount;
+        result
+    ) &, RHSExpression, UnsameQ, 2];
+    progress = 1;
     (* Check that the result is valid, i.e. of the form "tensorID"["indices"]. *)
     If[
         !MatchQ[result, _String[_String]],
     (* Then *)
-        Message[TCalc::ErrorResult];
+        Message[TCalc::ErrorResult, result];
         (* Clear the temporary tensors that were created for the purpose of the calculation. *)
         ClearTemp[];
         Abort[];
@@ -282,6 +320,8 @@ TCalc[LHSTensorID_String[LHSIndices_String], RHSExpression_, symbol_String : Def
     useIndices = TensorData[resultID]["DefaultIndices"];
     useCoords = TensorData[resultID]["DefaultCoords"];
     components = TensorData[resultID]["Components"][{useIndices, useCoords}];
+    (* Simplify the components. *)
+    components = TensorSimplify[components];
     If[
         LHSIndices === "",
     (* Then *)
@@ -328,6 +368,8 @@ TCalc[LHSTensorID_String[LHSIndices_String], RHSExpression_, symbol_String : Def
             "Symbol" -> symbol
         ]];
     ];
+    (* Print the explicit formula we calculated, including the correct index placement. TODO: Uncomment this in a future version, once this feature works properly. *)
+    (* OGRePrint["Calculated: ", TensorData[resultID]["Symbol"]]; *)
     (* Clear the temporary tensors that were created for the purpose of the calculation. *)
     ClearTemp[];
     Return[LHSTensorID];
@@ -437,19 +479,19 @@ TChangeSymbol[ID_String, symbol_String] := (
 CreateUsageMessage[TCheckForUpdates, {}, "checks the GitHub repository for new versions of this package. If a new version is available, the user will be given the option to download or install it."];
 TCheckForUpdates[] := Module[
     {
-        url = "https://raw.githubusercontent.com/bshoshany/OGRe/master/OGRe.m",
-        remoteFile,
-        versionLookup,
+        errorMessage,
         newVersion,
-        errorMessage
+        remoteFile,
+        toPrint,
+        versionLookup
     },
     errorMessage = Row[{"Error: Failed to check for updates. Please visit ", Hyperlink["https://github.com/bshoshany/OGRe"], " to check manually."}];
-    Print["Checking GitHub repository for updates..."];
-    remoteFile = Quiet[Import[url, "Text"]];
+    OGRePrint["Checking GitHub repository for updates..."];
+    remoteFile = Quiet[Import[OGReURL, "Text"]];
     If[
         remoteFile === $Failed,
     (* Then *)
-        Print[errorMessage];
+        OGRePrint[errorMessage];
         Abort[];
     ];
     versionLookup = StringCases[remoteFile, Shortest["OGReVersion = \"" ~~ __ ~~ "\";"]];
@@ -458,34 +500,40 @@ TCheckForUpdates[] := Module[
     (* Then *)
         newVersion = StringTake[versionLookup[[1]], {16, StringLength[versionLookup[[1]]] - 2}];
         If[
-            False (* newVersion === OGReVersion *),
+            newVersion === OGReVersion,
         (* Then *)
-            Print["You have the latest version of the package."],
+            OGRePrint["You have the latest version of the package."],
         (* Else *)
-            Print["A new version of the package is available: ", Style[newVersion, Bold]];
-            Print["\[Bullet] ", Button[
+            toPrint = {Row[{"A new version of the package is available: ", Style[newVersion, Bold]}]};
+            AppendTo[toPrint, Row[{"\[Bullet] ", CreateButton[
                 "Visit GitHub repository.",
-                SystemOpen["https://github.com/bshoshany/OGRe"],
-                BaseStyle -> "Hyperlink",
-                Appearance -> "Frameless"
-            ]];
-            Print["\[Bullet] ", Button[
-                "Download new version to " <> FileNameJoin[{NotebookDirectory[], "OGRe.m"}] <> " and reload the package.",
-                URLDownload[url, FileNameJoin[{NotebookDirectory[], "OGRe.m"}]]; Print["Downloaded! Reloading..."]; Get[FileNameJoin[{NotebookDirectory[], "OGRe.m"}]],
-                BaseStyle -> "Hyperlink",
-                Appearance -> "Frameless"
-            ]];
-            Print["\[Bullet] ", Button[
+                SystemOpen["https://github.com/bshoshany/OGRe"]
+            ]}]];
+            AppendTo[toPrint, Row[{"\[Bullet] ", CreateButton[
+                "Reload new version directly from GitHub without downloading it.",
+                Get[OGReURL]
+            ]}]];
+            (* If the notebook is an Untitled notebook, meaning it is not an actual file in the file system, then NotebookDirectory[] will return $Failed and issue the error message NotebookDirectory::nosv. Otherwise, show an option to download the notebook to the current notebook directory. *)
+            Off[NotebookDirectory::nosv];
+            If[
+                NotebookDirectory[] =!= $Failed,
+            (* Then *)
+                AppendTo[toPrint, Row[{"\[Bullet] ", CreateButton[
+                    "Download new version to " <> FileNameJoin[{NotebookDirectory[], "OGRe.m"}] <> " and reload the package.",
+                    URLDownload[OGReURL, FileNameJoin[{NotebookDirectory[], "OGRe.m"}]]; OGRePrint["Downloaded! Reloading..."]; Get[FileNameJoin[{NotebookDirectory[], "OGRe.m"}]]
+                ]}]];
+            ]
+            On[NotebookDirectory::nosv];
+            AppendTo[toPrint, Row[{"\[Bullet] ", CreateButton[
                 "Install new version to " <> FileNameJoin[{$UserBaseDirectory, "Applications", "OGRe.m"}] <> " and reload the package.",
-                URLDownload[url, FileNameJoin[{$UserBaseDirectory, "Applications", "OGRe.m"}]]; Print["Installed! Reloading..."]; Get[FileNameJoin[{$UserBaseDirectory, "Applications", "OGRe.m"}]],
-                BaseStyle -> "Hyperlink",
-                Appearance -> "Frameless"
-            ]];
+                URLDownload[OGReURL, FileNameJoin[{$UserBaseDirectory, "Applications", "OGRe.m"}]]; OGRePrint["Installed! Reloading..."]; Get[FileNameJoin[{$UserBaseDirectory, "Applications", "OGRe.m"}]]
+            ]}]];
+            OGRePrint[Column[toPrint]];
         ],
     (* Else *)
-        Print[errorMessage];
+        OGRePrint[errorMessage];
     ];
-]
+];
 
 
 CreateUsageMessage[TChristoffel, {metricID}, "calculates the Christoffel symbols (the coefficients of the Levi-Civita connection) from the metric `1` and stores the result in a new tensor object with ID \"`1`Christoffel\".
@@ -503,14 +551,14 @@ TChristoffel[metricID_String] := Module[
         Message[TChristoffel::ErrorNotMetric];
         Abort[];
     ];
-    (* Create a temporary tensor for the inverse metric, with two upper indices as its default configuration, to force the Christoffel symbols to have the correct index configuration. *)
+    (* Create a temporary tensor for the inverse metric, with two upper indices as its default configuration, to force the Christoffel symbols to have the correct index configuration. We do this to increase performance, since if we don't, then we'll have to raise the first index later, which is a costly operation. *)
     SetTensorID[inverseMetricID, Association[
         "Components" -> TensorData[metricID]["Components"],
         "DefaultCoords" -> TensorData[metricID]["DefaultCoords"],
         "DefaultIndices" -> {1, 1},
         "Metric" -> TensorData[metricID]["Metric"],
         "Role" -> "Temporary",
-        "Symbol" -> DefaultSymbol
+        "Symbol" -> Superscript[TensorData[metricID]["Symbol"], "\[Lambda]\[Sigma]"]
     ]];
     (* Calculate the Christoffel symbols, and give the tensor object the correct ID and symbol. *)
     christoffelID = TCalc[
@@ -568,6 +616,18 @@ TDelete[ID_String] := (
 );
 
 
+CreateUsageMessage[TDocs, {}, " opens the Mathematica notebook OGRe_Documentation.nb from the GitHub repository, which contains the full documentation for the package."];
+TDocs[] := (
+    If[
+        NotebookOpen["https://raw.githubusercontent.com/bshoshany/OGRe/master/OGRe_Documentation.nb"] === $Failed,
+    (* Then *)
+        OGRePrint[Row[{"Error: Failed to load the documentation. Please visit ", Hyperlink["https://github.com/bshoshany/OGRe"], " to download it manually."}]],
+    (* Else *)
+        OGRePrint["Successfully loaded the documentation from GitHub."];
+    ]
+);
+
+
 CreateUsageMessage[TEinsteinTensor, {metricID}, "calculates the Einstein tensor from the metric `1` and stores the result in a new tensor object with ID \"`1`Einstein\".
 If a tensor with ID \"`1`RicciTensor\" exists, it will be assumed to be the Ricci tensor of the metric, and will be used in the calculation. Otherwise, \"`1`RicciTensor\" will be created using TRicciTensor[ ]."];
 TEinsteinTensor::ErrorNotMetric = "The Einstein tensor can only be calculated from a tensor object representing a metric.";
@@ -619,7 +679,7 @@ TExportAll[filename_String] := Module[
     stream = OpenWrite[filename];
     Write[stream, TensorData];
     Close[stream];
-    Print["Exported all tensor data to ", filename, "."];
+    OGRePrint["Exported all tensor data to ", filename, "."];
 ];
 
 
@@ -681,7 +741,7 @@ TImportAll[filename_String] := Module[
     data = Read[stream];
     ImportTensorData[data];
     Close[stream];
-    Print["Imported all tensor data from ", filename, "."];
+    OGRePrint["Imported all tensor data from ", filename, "."];
 ];
 
 
@@ -700,19 +760,23 @@ TIndexLetters[Automatic] := TIndexLetters[DefaultIndexLetters];
 CreateUsageMessage[TInfo, {ID}, "displays information about the tensor object `1`, including its symbol, role, associated metric, and default coordinates and indices, in human-readable form.
 If `1` represents a coordinate system, displays a list of all tensors using it as their default coordinate system.
 If `1` represents a metric, displays a list of all tensors using it as their associated metric."];
-TInfo[ID_String] := (
+TInfo[ID_String] := Module[
+    {
+        info
+    },
     (* Check that the tensor object ID exists. *)
     CheckIfTensorExists[ID];
     (* Display information about the object. *)
-    Print[Style["ID: ", Bold], ID];
-    Print[Style["Symbol: ", Bold], TensorData[ID]["Symbol"]];
-    Print[Style["Role: ", Bold], TensorData[ID]["Role"]];
-    If[TensorData[ID]["Role"] =!= "Coordinates" && TensorData[ID]["Role"] =!= "Metric", Print[Style["Metric: ", Bold], TensorData[ID]["Metric"]]];
-    If[TensorData[ID]["Role"] =!= "Coordinates", Print[Style["Default Coordinates: ", Bold], TensorData[ID]["DefaultCoords"]]];
-    Print[Style["Default Indices: ", Bold], TensorData[ID]["DefaultIndices"]];
-    If[TensorData[ID]["Role"] === "Coordinates", Print[Style["Default Coordinates For: ", Bold], Row[Select[Keys[TensorData], TensorData[#]["DefaultCoords"] === ID && # =!= ID &], ", "]]];
-    If[TensorData[ID]["Role"] === "Metric", Print[Style["Tensors Using This Metric: ", Bold], Row[Select[Keys[TensorData], TensorData[#]["Metric"] === ID && # =!= ID &], ", "]]];
-);
+    info = {Row[{Style["ID: ", Bold], ID}]};
+    AppendTo[info, Row[{Style["Symbol: ", Bold], TensorData[ID]["Symbol"]}]];
+    AppendTo[info, Row[{Style["Role: ", Bold], TensorData[ID]["Role"]}]];
+    If[TensorData[ID]["Role"] =!= "Coordinates" && TensorData[ID]["Role"] =!= "Metric", AppendTo[info, Row[{Style["Metric: ", Bold], TensorData[ID]["Metric"]}]]];
+    If[TensorData[ID]["Role"] =!= "Coordinates", AppendTo[info, Row[{Style["Default Coordinates: ", Bold], TensorData[ID]["DefaultCoords"]}]]];
+    AppendTo[info, Row[{Style["Default Indices: ", Bold], TensorData[ID]["DefaultIndices"]}]];
+    If[TensorData[ID]["Role"] === "Coordinates", AppendTo[info, Row[{Style["Default Coordinates For: ", Bold], Row[Select[Keys[TensorData], TensorData[#]["DefaultCoords"] === ID && # =!= ID &], ", "]}]]];
+    If[TensorData[ID]["Role"] === "Metric", AppendTo[info, Row[{Style["Tensors Using This Metric: ", Bold], Row[Select[Keys[TensorData], TensorData[#]["Metric"] === ID && # =!= ID &], ", "]}]]];
+    OGRePrint[Column[info]];
+];
 
 
 CreateUsageMessage[TInitializeSymbols, {symbol1, symbol2, "..."}, "clears any definitions previously used for the given symbols and protects them against future changes.
@@ -725,10 +789,11 @@ TInitializeSymbols[symbols__] := (
 Attributes[TInitializeSymbols] = HoldAll;
 
 
-CreateUsageMessage[TList, {ID, indices, coordinatesID}, "lists the unique, non-zero components of the tensor object `1` with the index configuration `2` and in the coordinate system `3`.
+CreateUsageMessage[TList, {ID, indices, coordinatesID, function}, "lists the unique, non-zero components of the tensor object `1` with the index configuration `2` and in the coordinate system `3`.
 `2` should be a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index.
-If the index configuration and/or coordinate system are omitted, the default ones will be used."];
-TList[ID_String, indices_List : {"_UseDefault_"}, coordinatesID_String : "_UseDefault_"] := ShowList[ID, indices, coordinatesID, "List"];
+If the index configuration and/or coordinate system are omitted, the default ones will be used.
+`4` is an optional function to map to each of the tensor's elements before they are displayed. Typically this would be ReplaceAll[rules] to apply the rules to the elements, but any function can be used."];
+TList[ID_String, indices_List : {"_UseDefault_"}, coordinatesID_String : "_UseDefault_", function_:Identity] /; (!ListQ[function] && !StringQ[function]) := ShowList[ID, indices, coordinatesID, "List", function];
 
 
 CreateUsageMessage[TNewCoordinates, {coordinatesID, symbols}, "creates a new tensor object representing a coordinate system.
@@ -758,15 +823,28 @@ CreateUsageMessage[TNewMetric, {metricID, coordinatesID, components, symbol}, "c
 `2` is the unique ID of a tensor object representing a coordinate system, created using TNewCoordinates[ ].
 `3` is a square matrix representing the metric with two lower indices in that coordinate system.
 `4` will be used to represent the metric in formulas. If not given, \"g\" will be used."];
-TNewMetric::ErrorIncorrectDim = "The metric components must be a square matrix with the same dimension as the coordinates.";
-TNewMetric[metricID_String, coordinatesID_String, components_List?SquareMatrixQ, symbol_String : "g"] := Module[
+TNewMetric::ErrorIncorrectDim = "The metric components must have the same dimension as the coordinates.";
+TNewMetric::ErrorNotInvertible = "The metric must be invertible.";
+TNewMetric::ErrorNotSymmetric = "The metric must be symmetric.";
+TNewMetric::ErrorNotSquare = "The components of the metric must be a square matrix.";
+TNewMetric[metricID_String, coordinatesID_String, components_List, symbol_String : "g"] := Module[
     {
         dim = Length[components],
+        inverse,
         simplified
     },
     (* Check that the tensor object coordinatesID exists and represents a coordinate system. *)
     CheckIfTensorExists[coordinatesID];
     CheckIfCoordinates[coordinatesID];
+    (* Simplify the components. *)
+    simplified = TensorSimplify[components];
+    (* Check that the matrix is square. *)
+    If[
+        !SquareMatrixQ[simplified],
+    (* Then *)
+        Message[TNewMetric::ErrorNotSquare];
+        Abort[];
+    ]
     (* Check that the metric components have the same dimension as the coordinates. *)
     If[
         dim != Length[TensorData[coordinatesID]["Components"][{{1}, coordinatesID}]],
@@ -774,13 +852,27 @@ TNewMetric[metricID_String, coordinatesID_String, components_List?SquareMatrixQ,
         Message[TNewMetric::ErrorIncorrectDim];
         Abort[];
     ];
-    (* Simplify the components. *)
-    simplified = TensorSimplify[components];
+    (* Check that the matrix is symmetric. *)
+    If[
+        !SymmetricMatrixQ[simplified],
+    (* Then *)
+        Message[TNewMetric::ErrorNotSymmetric];
+        Abort[];
+    ];
+    (* Invert the components, and return an error if the matrix is singular or cannot be inverted for any reason. *)
+    inverse = Quiet[Check[Inverse[simplified], "Error"]];
+    If[
+        inverse === "Error",
+    (* Then *)
+        Message[TNewMetric::ErrorNotInvertible];
+        Abort[];
+    ];
+    inverse = TensorSimplify[inverse];
     (* Create a new tensor object for the metric with the desired ID. The components of the matrix in every possible index configuration will be calculated in advance in the default coordinate system, to improve performance. *)
     SetTensorID[metricID, Association[
         "Components" -> Association[
             {{-1, -1}, coordinatesID} -> simplified,
-            {{+1, +1}, coordinatesID} -> TensorSimplify[Inverse[simplified]],
+            {{+1, +1}, coordinatesID} -> inverse,
             {{+1, -1}, coordinatesID} -> IdentityMatrix[dim],
             {{-1, +1}, coordinatesID} -> IdentityMatrix[dim]
         ],
@@ -861,6 +953,28 @@ TNewTensor[tensorID_String, metricID_String, coordinatesID_String : "_UseDefault
     ]];
     Return[tensorID];
 ];
+
+
+CreateUsageMessage[TParallelize, {"True/False"}, "enables or disable the parallelization of tensor simplifications. The default value is `2`. If simplifications take less than a few seconds, then you should leave parallelization off, as it has a small overhead and may actually impede performance. However, if simplifications are taking more than a few seconds, then it is highly recommended to enable parallelization for a significant performance boost.", {"False"}];
+TParallelize[par_] := (
+    Unprotect[TensorData];
+    TensorData[Options]["Parallelize"] = par;
+    Protect[TensorData];
+    If[
+        par,
+    (* Then *)
+        OGRePrint["Parallelization enabled."];
+        (* Launch the kernels for parallelization if they have not been launched yet, or if fewer than the maximum available number of kernels have been launched. Better do it now than cause a delay later. *)
+        If[
+            $KernelCount < $ConfiguredKernels[[1, 1]],
+        (* Then *)
+            LaunchKernels[$ConfiguredKernels[[1, 1]] - $KernelCount];
+            OGRePrint[$KernelCount, " parallel kernels launched. CPU has ", $ProcessorCount, " cores."];
+        ],
+    (* Else *)
+        OGRePrint["Parallelization disabled."];
+    ];
+);
 
 
 CreateUsageMessage[TRicciScalar, {metricID}, "calculates the Ricci scalar from the metric `1` and stores the result in a new tensor object with ID \"`1`RicciScalar\".
@@ -965,10 +1079,11 @@ TRiemannTensor[metricID_String] := Module[
 ];
 
 
-CreateUsageMessage[TShow, {ID, indices, coordinatesID}, "shows the components of the tensor object `1` with the index configuration `2` and in the coordinate system `3`, in vector or matrix form when applicable.
+CreateUsageMessage[TShow, {ID, indices, coordinatesID, function}, "shows the components of the tensor object `1` with the index configuration `2` and in the coordinate system `3`, in vector or matrix form when applicable.
 `2` should be a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index.
-If the index configuration and/or coordinate system are omitted, the default ones will be used."];
-TShow[ID_String, indices_List : {"_UseDefault_"}, coordinatesID_String : "_UseDefault_"] := ShowList[ID, indices, coordinatesID, "Show"];
+If the index configuration and/or coordinate system are omitted, the default ones will be used.
+`4` is an optional function to map to each of the tensor's elements before they are displayed. Typically this would be ReplaceAll[rules] to apply the rules to the elements, but any function can be used."];
+TShow[ID_String, indices_List : {"_UseDefault_"}, coordinatesID_String : "_UseDefault_", function_:Identity] /; (!ListQ[function] && !StringQ[function]) := ShowList[ID, indices, coordinatesID, "Show", function];
 
 
 CreateUsageMessage[TSimplify, {ID}, "simplifies all previously-calculated representations of the tensor object `1` based on the user-defined simplification assumptions set using TSimplifyAssumptions[ ]. To be used if the assumptions have changed after the components have already been calculated."];
@@ -1074,6 +1189,7 @@ AddTensors[firstID_String[firstIndices_String], secondID_String[secondIndices_St
         firstVars,
         i,
         newID,
+        newSymbol,
         secondComponents,
         secondVars,
         sumComponents,
@@ -1134,6 +1250,34 @@ AddTensors[firstID_String[firstIndices_String], secondID_String[secondIndices_St
     Scan[(allVars[#] = Unique["var"]) &, Characters[firstIndices]];
     firstVars = allVars[#]& /@ Characters[firstIndices];
     secondVars = allVars[#]& /@ Characters[secondIndices];
+    (* Calculate the explicit symbolic representation for this operation, including the correct index placement. *)
+    newSymbol = Row[{
+        If[
+            TensorData[firstID]["Role"] === "Temporary",
+        (* Then *)
+            TensorData[firstID]["Symbol"],
+        (* Else *)
+            Subsuperscript[
+                TensorData[firstID]["Symbol"],
+                IndicesToLetters[-1, useIndices, firstIndices],
+                IndicesToLetters[+1, useIndices, firstIndices]
+            ]
+        ],
+        " + ",
+        If[
+            TensorData[secondID]["Role"] === "Temporary",
+        (* Then *)
+            TensorData[secondID]["Symbol"],
+        (* Else *)
+            Subsuperscript[
+                TensorData[secondID]["Symbol"],
+                IndicesToLetters[-1, useSecondIndices, secondIndices],
+                IndicesToLetters[+1, useSecondIndices, secondIndices]
+            ]
+        ]
+    }];
+    (* Let the user know the explicit operation we are performing, including the correct index placement. TODO: Uncomment this in a future version, once this feature works properly. *)
+    (* PrintTemporary["Adding ", newSymbol, "..."]; *)
     (* Add the two tensors by summing over their components using the appropriate variables. *)
     sumComponents = Table[
         firstComponents[[Sequence @@ firstVars]] + secondComponents[[Sequence @@ secondVars]],
@@ -1142,12 +1286,12 @@ AddTensors[firstID_String[firstIndices_String], secondID_String[secondIndices_St
     (* Store the result in a new temporary tensor, which will be deleted once the recursive calculation in TCalc is complete. *)
     newID = NewTempID[];
     SetTensorID[newID, Association[
-        "Components" -> Association[{useIndices, useCoords} -> TensorSimplify[sumComponents]],
+        "Components" -> Association[{useIndices, useCoords} -> sumComponents],
         "DefaultCoords" -> useCoords,
         "DefaultIndices" -> useIndices,
         "Metric" -> TensorData[firstID]["Metric"],
         "Role" -> "Temporary",
-        "Symbol" -> DefaultSymbol
+        "Symbol" -> Row[{"(", newSymbol, ")"}]
     ]];
     Return[newID[firstIndices]];
 ];
@@ -1279,6 +1423,7 @@ ContractTensors[firstID_String[firstIndices_String], secondID_String[secondIndic
         newComponents,
         newID,
         newIndices,
+        newSymbol,
         outIndices,
         outVars,
         removeIndices,
@@ -1311,12 +1456,12 @@ ContractTensors[firstID_String[firstIndices_String], secondID_String[secondIndic
     If[
         Length[useFirstIndices] == 0,
         (* Then *)
-        Return[TensorByScalar[secondID[secondIndices], TensorData[firstID]["Components"][{useFirstIndices, useCoords}][[1]]]]
+        Return[TensorByScalar[secondID[secondIndices], TensorData[firstID]["Components"][{useFirstIndices, useCoords}][[1]], TensorData[firstID]["Symbol"]]]
     ];
     If[
         Length[useSecondIndices] == 0,
         (* Then *)
-        Return[TensorByScalar[firstID[firstIndices], TensorData[secondID]["Components"][{useSecondIndices, useCoords}][[1]]]]
+        Return[TensorByScalar[firstID[firstIndices], TensorData[secondID]["Components"][{useSecondIndices, useCoords}][[1]], TensorData[secondID]["Symbol"]]]
     ];
     (* newIndices will be the index configuration of the newly created tensor. We start from the default indices of the first tensor, remove any indices that were contracted, and add the remaining free indices of the second tensor. *)
     newIndices = useFirstIndices;
@@ -1359,6 +1504,33 @@ ContractTensors[firstID_String[firstIndices_String], secondID_String[secondIndic
         AppendTo[outVars, allVars[#]];
         outIndices = outIndices <> #;
     ]& /@ Keys[allVars];
+    (* Calculate the explicit symbolic representation for this operation, including the correct index placement. *)
+    newSymbol = Row[{
+        If[
+            TensorData[firstID]["Role"] === "Temporary",
+        (* Then *)
+            TensorData[firstID]["Symbol"],
+        (* Else *)
+            Subsuperscript[
+                TensorData[firstID]["Symbol"],
+                IndicesToLetters[-1, useFirstIndices, firstIndices],
+                IndicesToLetters[+1, useFirstIndices, firstIndices]
+            ]
+        ],
+        If[
+            TensorData[secondID]["Role"] === "Temporary",
+        (* Then *)
+            TensorData[secondID]["Symbol"],
+        (* Else *)
+            Subsuperscript[
+                TensorData[secondID]["Symbol"],
+                IndicesToLetters[-1, useSecondIndices, secondIndices],
+                IndicesToLetters[+1, useSecondIndices, secondIndices]
+            ]
+        ]
+    }];
+    (* Let the user know the explicit operation we are performing, including the correct index placement. TODO: Uncomment this in a future version, once this feature works properly. *)
+    (* PrintTemporary["Contracting ", newSymbol, "..."]; *)
     (* Calculate the components of the new tensor by summing over the contracted variables. *)
     newComponents = Table[
         If[
@@ -1384,12 +1556,12 @@ ContractTensors[firstID_String[firstIndices_String], secondID_String[secondIndic
     (* Store the result in a new temporary tensor, which will be deleted once the recursive calculation in TCalc is complete. *)
     newID = NewTempID[];
     SetTensorID[newID, Association[
-        "Components" -> Association[{newIndices, useCoords} -> TensorSimplify[newComponents]],
+        "Components" -> Association[{newIndices, useCoords} -> newComponents],
         "DefaultCoords" -> useCoords,
         "DefaultIndices" -> newIndices,
         "Metric" -> TensorData[firstID]["Metric"],
         "Role" -> "Temporary",
-        "Symbol" -> DefaultSymbol
+        "Symbol" -> newSymbol
     ]];
     Return[newID[outIndices]];
 ];
@@ -1425,8 +1597,8 @@ CovariantDivOrGrad[derivativeIndex_String, tensorID_String[tensorIndices_String]
         "DefaultCoords" -> useCoords,
         "DefaultIndices" -> useIndices,
         "Metric" -> TensorData[tensorID]["Metric"],
-        "Role" -> "Temporary",
-        "Symbol" -> DefaultSymbol
+        "Role" -> "CovariantDivOrGrad",
+        "Symbol" -> TensorData[tensorID]["Symbol"]
     ]];
     (* The first term is just the partial derivative. *)
     out = DivOrGrad[derivativeIndex, newID[tensorIndices]];
@@ -1438,6 +1610,8 @@ CovariantDivOrGrad[derivativeIndex_String, tensorID_String[tensorIndices_String]
         ]) &,
         Characters[tensorIndices]
     ];
+    (* Delete the temporary tensor we created above. *)
+    RemoveTensorID[newID];
     Return[out];
 ];
 
@@ -1454,6 +1628,7 @@ DivOrGrad[derivativeIndex_String, tensorID_String[tensorIndices_String]] := Modu
         newComponents,
         newID,
         newIndices,
+        newSymbol,
         outIndices,
         outVars,
         pos,
@@ -1506,6 +1681,23 @@ DivOrGrad[derivativeIndex_String, tensorID_String[tensorIndices_String]] := Modu
     ]& /@ Keys[allVars];
     (* Collect the coordinate symbols, since we are taking derivatives with respect to them. *)
     coordinateSymbols = TensorData[useCoords]["Components"][{{1}, useCoords}];
+    (* Calculate the explicit symbolic representation for this operation, including the correct index placement. *)
+    newSymbol = Row[{
+        Subscript["\[PartialD]", derivativeIndex],
+        If[
+            TensorData[tensorID]["Role"] === "Temporary",
+        (* Then *)
+            TensorData[tensorID]["Symbol"],
+        (* Else *)
+            Subsuperscript[
+                TensorData[tensorID]["Symbol"],
+                IndicesToLetters[-1, useIndices, tensorIndices],
+                IndicesToLetters[+1, useIndices, tensorIndices]
+            ]
+        ]
+    }];
+    (* Let the user know the explicit operation we are performing, including the correct index placement. TODO: Uncomment this in a future version, once this feature works properly. *)
+    (* PrintTemporary["Taking the partial derivative ", newSymbol, "..."]; *)
     (* Calculate the components of the new tensor by summing over the contracted variables and taking the derivatives of the tensor's components. *)
     newComponents = Table[
         If[
@@ -1531,12 +1723,12 @@ DivOrGrad[derivativeIndex_String, tensorID_String[tensorIndices_String]] := Modu
     (* Store the result in a new temporary tensor, which will be deleted once the recursive calculation in TCalc is complete. *)
     newID = NewTempID[];
     SetTensorID[newID, Association[
-        "Components" -> Association[{newIndices, useCoords} -> TensorSimplify[newComponents]],
+        "Components" -> Association[{newIndices, useCoords} -> newComponents],
         "DefaultCoords" -> useCoords,
         "DefaultIndices" -> newIndices,
         "Metric" -> TensorData[tensorID]["Metric"],
         "Role" -> "Temporary",
-        "Symbol" -> DefaultSymbol
+        "Symbol" -> newSymbol
     ]];
     Return[newID[outIndices]];
 ];
@@ -1622,15 +1814,15 @@ RaiseLower[ID_String, coordinatesID_String, oldIndices_List, indexPos_Integer, u
     oldVars = ReplacePart[newVars, indexPos -> sumVar];
     raiseVar = newVars[[indexPos]];
     (* Create the new components using a Table with newVars as iterators. Each component will be calculated using a Sum with sumVar as the summation variable. *)
-    newComponents = (TensorSimplify[Table[
+    newComponents = (Table[
             Sum[
                 useMetric[[raiseVar, sumVar]] * components[[Sequence @@ oldVars]],
                 {sumVar, 1, dim}
             ], ##
-        ]] &) @@ ({#, 1, dim} &) /@ newVars;
+        ] &) @@ ({#, 1, dim} &) /@ newVars;
     (* Store the new representation in the tensor object. *)
     allComponents = TensorData[ID]["Components"];
-    allComponents[{newIndices, coordinatesID}] = newComponents;
+    allComponents[{newIndices, coordinatesID}] = TensorSimplify[newComponents];
     ChangeTensorKey[ID, "Components", allComponents];
     (* Return the new index configuration. *)
     Return[newIndices];
@@ -1654,7 +1846,7 @@ SetTensorID[ID_String, data_Association] := (
 
 
 (* Show or list a tensor's components. Called by TShow and TList. *)
-ShowList[ID_String, indices_List, coordinatesID_String, showOrList_String] := Module[
+ShowList[ID_String, indices_List, coordinatesID_String, showOrList_String, function_: Identity] := Module[
     {
         allElements,
         components,
@@ -1693,6 +1885,8 @@ ShowList[ID_String, indices_List, coordinatesID_String, showOrList_String] := Mo
     ];
     (* Get the components of the tensor in the given representation (indices and coordinate system), or calculate it if it does not already exist. *)
     components = AddRepresentation[ID, useIndices, useCoords];
+    (* Apply the optional function to the components. *)
+    components = Map[function, components, {ArrayDepth[components]}];
     (* Execute the following if called by TShow. *)
     If[
         showOrList === "Show",
@@ -1721,8 +1915,8 @@ ShowList[ID_String, indices_List, coordinatesID_String, showOrList_String] := Mo
         (* Else *)
             row = Join[row, components]
         ];
-        (* Return the row, formatted using Nice. *)
-        Return[Nice[Row[row]]];
+        (* Print the row, formatted using Nice. *)
+        OGRePrint[Nice[Row[row]]];
     ];
     (* Execute the following if called by TList. *)
     If[
@@ -1782,8 +1976,8 @@ ShowList[ID_String, indices_List, coordinatesID_String, showOrList_String] := Mo
                 Alignment -> {Left, Baseline}
             ];
         ];
-        (* Return the grid, preceded by the tensor's ID, formatted using Nice. *)
-        Return[Nice[Column[
+        (* Print the grid, preceded by the tensor's ID, formatted using Nice. *)
+        OGRePrint[Nice[Column[
             {
                 Row[{ID, ":"}],
                 grid
@@ -1796,10 +1990,11 @@ ShowList[ID_String, indices_List, coordinatesID_String, showOrList_String] := Mo
 
 (* Multiply a tensor object by a scalar. *)
 TensorByScalar::ErrorCoords = "The tensor \"`1`\" cannot be multiplied by a scalar, as it represents a coordinate system.";
-TensorByScalar[ID_String[indices_String], scalar_] := Module[
+TensorByScalar[ID_String[indices_String], scalar_, useSymbol_: False] := Module[
     {
         newComponents,
         newID,
+        newSymbol,
         useCoords,
         useIndices
     },
@@ -1817,24 +2012,53 @@ TensorByScalar[ID_String[indices_String], scalar_] := Module[
     (* The components that will be multiplied are the ones corresponding to the default representation of the tensor. *)
     useIndices = TensorData[ID]["DefaultIndices"];
     useCoords = TensorData[ID]["DefaultCoords"];
+    (* Calculate the explicit symbolic representation for this operation, including the correct index placement. *)
+    newSymbol = Row[{
+        (* If the scalar is -1, we just prefix the tensor with a negative sign. If it's any other number, we use that number as the prefix. If it is a rank 0 tensor, we use its symbol. Otherwise, we add parentheses in case it is an expression with several terms. *)
+        Which[
+            NumberQ[scalar] && scalar == -1, "-",
+            NumberQ[scalar], scalar,
+            useSymbol =!= False, useSymbol,
+            True, Splice[{"(", scalar, ")"}]
+        ],
+        If[
+            TensorData[ID]["Role"] === "Temporary",
+        (* Then *)
+            TensorData[ID]["Symbol"],
+        (* Else *)
+            Subsuperscript[
+                TensorData[ID]["Symbol"],
+                IndicesToLetters[-1, useIndices, indices],
+                IndicesToLetters[+1, useIndices, indices]
+            ]
+        ]
+    }];
+    (* Let the user know the explicit operation we are performing, including the correct index placement. TODO: Uncomment this in a future version, once this feature works properly. *)
+    (* PrintTemporary["Multiplying by scalar ", newSymbol, "..."]; *)
+    (* Calculate the product of the scalar with the tensor. *)
     newComponents = scalar * TensorData[ID]["Components"][{useIndices, useCoords}];
     (* Store the result in a new temporary tensor, which will be deleted once the recursive calculation in TCalc is complete. *)
     newID = NewTempID[];
     SetTensorID[newID, Association[
-        "Components" -> Association[{useIndices, useCoords} -> TensorSimplify[newComponents]],
+        "Components" -> Association[{useIndices, useCoords} -> newComponents],
         "DefaultCoords" -> useCoords,
         "DefaultIndices" -> useIndices,
         "Metric" -> TensorData[ID]["Metric"],
         "Role" -> "Temporary",
-        "Symbol" -> DefaultSymbol
+        "Symbol" -> newSymbol
     ]];
     Return[newID[indices]];
 ];
 
-
 (* Simplify an expression with optional user-defined assumptions. *)
-TensorSimplify[expression_] := FullSimplify[expression,
-    Join[
+TensorSimplify[expression_] := Module[
+    {
+        assumptions,
+        progress,
+        result,
+        tasks
+    },
+    assumptions = Join[
         {
             If[
                 TensorData[Options]["SimplifyAssumptions"]["AssumeReal"],
@@ -1846,7 +2070,33 @@ TensorSimplify[expression_] := FullSimplify[expression,
         },
         (* The flattening is for compatibility with v1.0, since the assumptions were not stored as a list in that version. *)
         Flatten[{TensorData[Options]["SimplifyAssumptions"]["User"]}]
-    ]
+    ];
+    (* Print a dynamic progress indicator. The progress parameter will be shared between all kernels so they can update it. *)
+    progress = 0;
+    SetSharedVariable[progress];
+    PrintTemporary["Simplification progress: ", ProgressIndicator[Dynamic[progress], {0, Times @@ Dimensions[expression]}]];
+    If[
+        TensorData[Options]["Parallelize"],
+    (* Then *)
+        (* Submit the simplification of each element in the tensor as an individual task. Whenever a kernel becomes available, it will pick up the next available task. This results in better performance than ParallelMap. *)
+        tasks = Map[
+            (* Using Block instead of Module here for maximum performance. *)
+            element |-> ParallelSubmit[Block[{simplified = FullSimplify[element, assumptions]}, progress++; simplified]],
+            expression,
+            {ArrayDepth[expression]}
+        ];
+        (* Wait for all tasks to be completed. *)
+        result = WaitAll[tasks],
+    (* Else *)
+        (* Do the same without parallelization. *)
+        result = Map[
+            element |-> Block[{simplified = FullSimplify[element, assumptions]}, progress++; simplified],
+            expression,
+            {ArrayDepth[expression]}
+        ];
+    ];
+    UnsetShared[progress];
+    Return[result];
 ];
 
 

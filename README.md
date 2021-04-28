@@ -1,9 +1,10 @@
-# OGRe: An (O)bject-oriented (G)eneral (Re)lativity Package for Mathematica
+# OGRe: An **O**bject-Oriented **G**eneral **Re**lativity Package for Mathematica
 
 <!-- TOC depthFrom:2 -->
 
 - [Summary](#summary)
 - [Features](#features)
+- [Installing and loading the package](#installing-and-loading-the-package)
 - [Documentation](#documentation)
 - [Version history](#version-history)
 - [Citing](#citing)
@@ -32,14 +33,30 @@ I initially created OGRe for use in my own research, so I made it as flexible an
 * Define coordinate systems and the transformation rules between them. Tensor components are then transformed automatically between coordinates behind the scenes as needed.
 * Each tensor is associated with a specific metric. Tensor components are then transformed automatically between different index configurations, raising and lowering indices behind the scenes as needed.
 * Display any tensor in any index configuration and coordinate system, either in vector/matrix form or as a list of all unique non-zero elements.
-* Automatically simplify tensor components, optionally with user-defined simplification assumptions.
+* Automatically simplify tensor components, optionally with user-defined simplification assumptions. Simplifications can be parallelized for a significant performance boost.
 * Export tensors to a Mathematica notebook or to a file, so they can later be imported into another Mathematica session without having to redefine them from scratch.
 * Easily calculate arbitrary tensor formulas using any combination of addition, multiplication by scalar, trace, contraction, partial derivative, and covariant derivative.
 * Built-in modules for calculating the Christoffel symbols (Levi-Civita connection), Riemann tensor, Ricci tensor and scalar, and Einstein tensor. More will be added in future versions.
+* Built with speed and performance in mind, using optimized algorithms designed specifically for this package.
 * Fully portable. Can be imported directly from the web into any Mathematica notebook, without downloading or installing anything.
 * Clear and detailed documentation, with many examples, in both [Mathematica notebook](OGRe_Documentation.nb) and [PDF](OGRe_Documentation.pdf) format. Detailed usage messages are also provided.
 * Open source. The code is extensively documented; please feel free to fork and modify it as you see fit.
 * Under active development. Please see the "future plans" section of the documentation for more information. Bug reports and feature requests are welcome, and should be made via GitHub issues.
+
+<a id="markdown-installing-and-loading-the-package" name="installing-and-loading-the-package"></a>
+## Installing and loading the package
+
+The package consists of only one file, `OGRe.m`. There are several different ways to load the package:
+
+* **Run from local file with installation:** This is the recommended option, as it allows you to permanently use the package offline from any Mathematica notebook. Download the file `OGRe.m` from [the GitHub repository](https://github.com/bshoshany/OGRe) and copy it to the directory given by `FileNameJoin[{$UserBaseDirectory, "Applications"}]`. The package may now be loaded from any notebook by writing ``Needs["OGRe`"]`` (note the backtick <code>&#96;</code> following the word OGRe).
+
+* **Run from local file without installation:** This option allows you to use the package in a portable fashion, without installing it in the `Applications` directory. Download the file `OGRe.m` from [the GitHub repository](https://github.com/bshoshany/OGRe), place it in the same directory as the notebook you would like to use, and use the command `Get["OGRe.m", Path->NotebookDirectory[]]` to load the package.
+
+* **Run from web with installation:** This option allows you to automatically download and install the package on any computer. Simply run the command `URLDownload["https://raw.githubusercontent.com/bshoshany/OGRe/master/OGRe.m", FileNameJoin[{$UserBaseDirectory, "Applications", "OGRe.m"}]]` from any Mathematica notebook to permanently install the package. Then use ``Needs["OGRe`"]`` from any notebook to load it.
+
+* **Run from web without installation:** This option allows you to use the package from any Mathematica notebook on any computer, without manually downloading or installing it, as long as you have a working Internet connection. It also ensures that you always use the latest version of the package, but be aware that updates may sometimes not be fully backwards compatible. Simply write `Get["https://raw.githubusercontent.com/bshoshany/OGRe/master/OGRe.m"]` in any Mathematica notebook to load the package.
+
+To uninstall the package, just delete the file from the `Applications` directory, which can be done from within Mathematica using the command `DeleteFile[FileNameJoin[{$UserBaseDirectory, "Applications", "OGRe.m"}]]`.
 
 <a id="markdown-documentation" name="documentation"></a>
 ## Documentation
@@ -49,9 +66,38 @@ The full and detailed documentation for this package may be found in the followi
 * `OGRe_Documentation.nb`: An interactive Mathematica notebook. Requires Mathematica to open.
 * `OGRe_Documentation.pdf`: A PDF version of the notebook. Can be viewed with any PDF reader.
 
+Once the package is loaded, the documentation can be easily accessed by executing the command `TDocs[]`, which automatically downloads the file `OGRe_Documentation.nb` from GitHub and opens it in Mathematica.
+
 <a id="markdown-version-history" name="version-history"></a>
 ## Version history
 
+* v1.2 (2021-04-28)
+    * New modules:
+        * `TDocs`: Opens the Mathematica notebook `OGRe_Documentation.nb` directly from the GitHub repository. This allows users to instantly access the latest documentation from any Mathematica session, whether the package itself was loaded locally or from GitHub.
+        * `TParallelize`:
+            * Enables or disable the parallelization of tensor simplifications (see below). It is disabled by default.
+            * As a rule of thumb, if simplifications are taking less than a few seconds, then you should leave parallelization off, as it has a small overhead and may actually impede performance in that case. However, if simplifications are taking more than a few seconds, then it is highly recommended to enable parallelization for a significant performance boost.
+            * This setting will be exported when using `TExportAll`, so it will be imported automatically with `TImportAll` in future sessions.
+            * Aspects of the package other than simplification are not parallelized, since they are typically short calculations with few elements, and would not benefit from parallelization.
+    * Changes to existing modules:
+        * `TCalc` now displays a progress bar (see below).
+        * `TCheckForUpdates`:
+            * Fixed a bug where this module falsely reported that a new version is available.
+            * Fixed a bug where this module issued an error when giving the option to download `OGRe.m` to the current notebook directory if the notebook is an Untitled notebook, meaning it is not an actual file in the file system and thus does not have a notebook directory.
+            * This module now gives the user the option to reload the new version directly from GitHub without saving it locally.
+        * `TList` and `TShow`:
+            * The output of these modules is now uneditable. I made this change after I noticed that some users were editing the output, thinking that they are editing the tensor itself. (An option to actually edit the elements of a tensor in `MatrixForm` may be added in a future version.)
+            * These modules now take a fourth optional argument: a function to map to each of the tensor's elements before they are displayed. Typically this would be `ReplaceAll[rules]` to apply the `rules` to the elements, but any function can be used. Note that applying `ReplaceAll` to the output of `TShow` or `TList` directly won't work, since the output is formatted.
+        * `TNewMetric` now verifies that the metric components are an invertible, symmetric, and square matrix.
+    * Other changes:
+        * The performance of simplifications has been improved considerably!
+            * Simplifications are now performed automatically less often, to prevent simplifying the same expression multiple times.
+            * In addition, simplifications can now be parallelized. This is enabled using the new module `TParallelize` (see above). The parallelization is implemented using a thread pool model (with `ParallelSubmit` and `WaitAll`), which in my benchmarks was found to provide better performance than the simpler `Parallelize` or `ParallelMap`.
+            * Parallelization can potentially provide a speedup proportional to the number of parallel kernels. Note that this number is determined by your Mathematica license, and it may be less than the number of cores in your CPU.
+        * Calculations with `TCalc` and simplifications now both display progress bars, so you can keep track of long calculations. This was a popular feature request, especially for simplifications, since they are usually the most time-consuming operations.
+        * Improved the appearance of the welcome message.
+        * Messages from OGRe are now displayed with a special cell label.
+        * Information on how to load the package is now displayed in the `README.md` file.
 * v1.1 (2021-04-15)
     * New modules:
         * `TCheckForUpdates`: Automatically checks the GitHub repository for updates. If a new version of the package is available, the module will offer an option to download or install the new version and reload the package.
