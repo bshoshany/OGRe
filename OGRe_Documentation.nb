@@ -27,7 +27,7 @@ Cell[TextData[{
   ButtonData->{
     URL["https://baraksh.com/"], None},
   ButtonNote->"https://baraksh.com/"],
- ")\nDocumentation for v1.2 (April 28, 2021)\n",
+ ")\nDocumentation for v1.3 (May 6, 2021)\n",
  ButtonBox["https://github.com/bshoshany/OGRe",
   BaseStyle->"Hyperlink",
   ButtonData->{

@@ -71,6 +71,14 @@ Once the package is loaded, the documentation can be easily accessed by executin
 <a id="markdown-version-history" name="version-history"></a>
 ## Version history
 
+* v1.3 (2021-05-06)
+    * Changes to existing modules:
+        * `TExport`, `TExportAll`, `TImport`, and `TImportAll`:
+            * Added a clarification in the usage messages for `TExportAll` and `TImportAll` that the directory where the file will be saved or read from can be changed using `SetDirectory`.
+            * Importing tensors from a different OGRe version (whether older or newer) will now issue a warning that compatibility issues may occur.
+            * `Options` will now be populated correctly with the specific keys relevant to this version, even if you import from other versions which may use different `Options` keys.
+    * Other changes:
+        * The previous update of the package made use of the new Mathematica syntax for anonymous functions, `x |-> body`. However, since this is a new feature introduced in Mathematica 12.2, this accidentally made the package incompatible with earlier Mathematica versions. I changed it to the old syntax `Function[x, body]` in order to maintain compatibility.
 * v1.2 (2021-04-28)
     * New modules:
         * `TDocs`: Opens the Mathematica notebook `OGRe_Documentation.nb` directly from the GitHub repository. This allows users to instantly access the latest documentation from any Mathematica session, whether the package itself was loaded locally or from GitHub.

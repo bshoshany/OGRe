@@ -71,7 +71,7 @@ Begin["`Private`"]; (* OGRe`Private` *)
 
 
 (* DO NOT change the format of the next line. It is used by TCheckForUpdates to detect the version of this file. Changing it will break the automatic update mechanism. Only change the version number and date. *)
-OGReVersion = "v1.2 (April 28, 2021)";
+OGReVersion = "v1.3 (May 6, 2021)";
 
 
 (* The raw URL of this file on GitHub. *)
@@ -112,22 +112,50 @@ OGRePrint[Column[{
 
 (* A special key in TensorData, Options, is used to store information about the current session, for the purpose of exporting and importing between sessions using TExportAll and TImportAll. Since this key is not a string, it cannot be accidentally overwritten by a tensor definition. *)
 DefaultIndexLetters = "\[Mu]\[Nu]\[Rho]\[Sigma]\[Kappa]\[Lambda]\[Alpha]\[Beta]\[Gamma]\[Delta]\[CurlyEpsilon]\[Zeta]\[Epsilon]\[Theta]\[Iota]\[Xi]\[Pi]\[Tau]\[Phi]\[Chi]\[Psi]\[Omega]";
-PopulateOptions[] := (
-    (* The key will be created on startup only if it does not already exist, to allow for consistency when debugging or reloading the package after an update. It will also be created when using TImportAll if it does not already exist, in case tensors are imported from an earlier version, or the user messed with the data. *)
+PopulateOptions[] := Module[
+    {
+        useIndexLetters,
+        useParallelize,
+        useSimplifyAssumptions
+    },
     If[
         !KeyExistsQ[TensorData, Options],
     (* Then *)
+        (* If the Options key doesn't exist, which can happen when the package first loads or when importing from an old version of OGRe, create it with the default values. *)
         TensorData[Options] = Association[
             "OGReVersion" -> OGReVersion,
             "IndexLetters" -> DefaultIndexLetters,
+            "Parallelize" -> False,
             "SimplifyAssumptions" -> Association[
                 "AssumeReal" -> True,
                 "User" -> None
+            ]
+        ],
+    (* Else *)
+        (* If the Options key does exist, populate it with the imported values, but substitute the default values if any keys are missing, which can happen when importing from a different version of OGRe. *)
+        useIndexLetters = Lookup[TensorData[Options], "IndexLetters", DefaultIndexLetters];
+        useParallelize = Lookup[TensorData[Options], "Parallelize", False];
+        If[
+            KeyExistsQ[TensorData[Options], "SimplifyAssumptions"],
+        (* Then *)
+            useSimplifyAssumptions = Association[
+                "AssumeReal" -> Lookup[TensorData[Options]["SimplifyAssumptions"], "AssumeReal", True],
+                "User" -> Lookup[TensorData[Options]["SimplifyAssumptions"], "User", None]
             ],
-            "Parallelize" -> False
-        ]
-    ]
-);
+        (* Else *)
+            useSimplifyAssumptions = Association[
+                "AssumeReal" -> True,
+                "User" -> None
+            ]
+        ];
+        TensorData[Options] = Association[
+            "OGReVersion" -> OGReVersion,
+            "IndexLetters" -> useIndexLetters,
+            "Parallelize" -> useParallelize,
+            "SimplifyAssumptions" -> useSimplifyAssumptions
+        ];
+    ];
+];
 PopulateOptions[];
 
 
@@ -670,7 +698,7 @@ TExport[ID_String] := (
 
 
 CreateUsageMessage[TExportAll, {filename}, "exports the raw tensor data for all tensors defined in the current session as an Association.
-`1` is optional. If specified, the data is exported to a file with this name. If a full path is not given, the file will be created in the current working directory, as given by Directory[ ]. Note that the file will be overwritten if it already exists."];
+`1` is optional. If specified, the data is exported to a file with this name. If a full path is not given, the file will be created in the current working directory, as given by Directory[ ]. This directory can be changed using SetDirectory[ ]. Note that the file will be overwritten if it already exists."];
 TExportAll[] := TensorData;
 TExportAll[filename_String] := Module[
     {
@@ -712,7 +740,11 @@ WARNING:
 1. The data is assumed to not have been manually modified by the user, so it is NOT checked for errors or inconsistencies. Importing tensor data that has been manually modified may cause errors or unexpected results, and should be avoided.
 2. The ID of the tensor will be taken from the name of the (single) key of the Association being imported. If a tensor with the same ID already exists, it will be overwritten."];
 TImport[data_Association] := (
-    (* Currently we just drop the OGReVersion key, but in future versions we might use it to determine how to properly import the tensor in a backwards-compatible way. *)
+    If[
+        !KeyExistsQ[data[[1]], "OGReVersion"] || data[[1]]["OGReVersion"] != OGReVersion,
+    (* Then *)
+        OGRePrint["Warning: The imported tensor was created in a different version of OGRe. Compatibility issues may occur."];
+    ]
     SetTensorID[Keys[data][[1]], KeyDrop[Values[data][[1]], "OGReVersion"]];
     Return[Keys[data][[1]]];
 );
@@ -720,7 +752,7 @@ TImport[data_Association] := (
 
 CreateUsageMessage[TImportAll, {source}, "imports tensor data that has been exported using TExportAll[ ].
 If `1` is an Association, imports the data directly.
-If `1` is a file name, imports the data from that file. If a full path is not given, the file should be located in the current working directory, as given by Directory[ ].
+If `1` is a file name, imports the data from that file. If a full path is not given, the file should be located in the current working directory, as given by Directory[ ]. This directory can be changed using SetDirectory[ ].
 WARNING:
 1. The data is assumed to not have been manually modified by the user, so it is NOT checked for errors or inconsistencies. Importing tensor data that has been manually modified may cause errors or unexpected results, and should be avoided.
 2. This will irreversibly delete ALL of the tensors already defined in the current session."];
@@ -793,7 +825,7 @@ CreateUsageMessage[TList, {ID, indices, coordinatesID, function}, "lists the uni
 `2` should be a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index.
 If the index configuration and/or coordinate system are omitted, the default ones will be used.
 `4` is an optional function to map to each of the tensor's elements before they are displayed. Typically this would be ReplaceAll[rules] to apply the rules to the elements, but any function can be used."];
-TList[ID_String, indices_List : {"_UseDefault_"}, coordinatesID_String : "_UseDefault_", function_:Identity] /; (!ListQ[function] && !StringQ[function]) := ShowList[ID, indices, coordinatesID, "List", function];
+TList[ID_String, indices_List : {"_UseDefault_"}, coordinatesID_String : "_UseDefault_", function_ : Identity] /; (!ListQ[function] && !StringQ[function]) := ShowList[ID, indices, coordinatesID, "List", function];
 
 
 CreateUsageMessage[TNewCoordinates, {coordinatesID, symbols}, "creates a new tensor object representing a coordinate system.
@@ -1083,7 +1115,7 @@ CreateUsageMessage[TShow, {ID, indices, coordinatesID, function}, "shows the com
 `2` should be a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index.
 If the index configuration and/or coordinate system are omitted, the default ones will be used.
 `4` is an optional function to map to each of the tensor's elements before they are displayed. Typically this would be ReplaceAll[rules] to apply the rules to the elements, but any function can be used."];
-TShow[ID_String, indices_List : {"_UseDefault_"}, coordinatesID_String : "_UseDefault_", function_:Identity] /; (!ListQ[function] && !StringQ[function]) := ShowList[ID, indices, coordinatesID, "Show", function];
+TShow[ID_String, indices_List : {"_UseDefault_"}, coordinatesID_String : "_UseDefault_", function_ : Identity] /; (!ListQ[function] && !StringQ[function]) := ShowList[ID, indices, coordinatesID, "Show", function];
 
 
 CreateUsageMessage[TSimplify, {ID}, "simplifies all previously-calculated representations of the tensor object `1` based on the user-defined simplification assumptions set using TSimplifyAssumptions[ ]. To be used if the assumptions have changed after the components have already been calculated."];
@@ -1736,6 +1768,11 @@ DivOrGrad[derivativeIndex_String, tensorID_String[tensorIndices_String]] := Modu
 
 (* Replace TensorData with the given Association. All previously defined tensor objects will be erased. The Options key will be created if it does not already exist (for compatibility with v1.0). *)
 ImportTensorData[data_Association] := (
+    If[
+        !KeyExistsQ[data, Options] || !KeyExistsQ[data[Options], "OGReVersion"] || data[Options]["OGReVersion"] != OGReVersion,
+    (* Then *)
+        OGRePrint["Warning: The imported tensors were created in a different version of OGRe. Compatibility issues may occur."];
+    ]
     Unprotect[TensorData];
     TensorData = data;
     PopulateOptions[];
@@ -1846,7 +1883,7 @@ SetTensorID[ID_String, data_Association] := (
 
 
 (* Show or list a tensor's components. Called by TShow and TList. *)
-ShowList[ID_String, indices_List, coordinatesID_String, showOrList_String, function_: Identity] := Module[
+ShowList[ID_String, indices_List, coordinatesID_String, showOrList_String, function_ : Identity] := Module[
     {
         allElements,
         components,
@@ -2081,7 +2118,7 @@ TensorSimplify[expression_] := Module[
         (* Submit the simplification of each element in the tensor as an individual task. Whenever a kernel becomes available, it will pick up the next available task. This results in better performance than ParallelMap. *)
         tasks = Map[
             (* Using Block instead of Module here for maximum performance. *)
-            element |-> ParallelSubmit[Block[{simplified = FullSimplify[element, assumptions]}, progress++; simplified]],
+            Function[element, ParallelSubmit[Block[{simplified = FullSimplify[element, assumptions]}, progress++; simplified]]],
             expression,
             {ArrayDepth[expression]}
         ];
@@ -2090,7 +2127,7 @@ TensorSimplify[expression_] := Module[
     (* Else *)
         (* Do the same without parallelization. *)
         result = Map[
-            element |-> Block[{simplified = FullSimplify[element, assumptions]}, progress++; simplified],
+            Function[element, Block[{simplified = FullSimplify[element, assumptions]}, progress++; simplified]],
             expression,
             {ArrayDepth[expression]}
         ];
