@@ -4,6 +4,10 @@
 (* OGRe: An (O)bject-Oriented (G)eneral (Re)lativity Package for Mathematica *)
 (*            By Barak Shoshany (baraksh@gmail.com) (baraksh.com)            *)
 (*                     https://github.com/bshoshany/OGRe                     *)
+(*     Copyright (c) 2021 Barak Shoshany. Licensed under the MIT license.    *)
+(* If you use this package in published research, please cite it as follows: *)
+(*    Barak Shoshany, "OGRe: An Object-Oriented General Relativity Package   *)
+(*        for Mathematica", doi:10.5281/zenodo.4742935 (May 2021)            *)
 
 
 BeginPackage["OGRe`"];
@@ -34,36 +38,36 @@ If[
 Null[{
     TAddCoordTransformation,
     TCalc,
+    TCalcChristoffel,
+    TCalcEinsteinTensor,
+    TCalcRicciScalar,
+    TCalcRicciTensor,
+    TCalcRiemannTensor,
     TChangeDefaultCoords,
     TChangeDefaultIndices,
     TChangeID,
     TChangeSymbol,
     TCheckForUpdates,
-    TChristoffel,
     TCovariantD,
     TDelete,
     TDocs,
-    TEinsteinTensor,
     TExport,
     TExportAll,
     TGetComponents,
     TImport,
     TImportAll,
-    TIndexLetters,
     TInfo,
     TInitializeSymbols,
     TList,
     TNewCoordinates,
     TNewMetric,
     TNewTensor,
-    TParallelize,
     TPartialD,
-    TRicciScalar,
-    TRicciTensor,
-    TRiemannTensor,
+    TSetAssumptions,
+    TSetIndexLetters,
+    TSetParallelization,
     TShow,
-    TSimplify,
-    TSimplifyAssumptions
+    TSimplify
 }];
 
 
@@ -71,120 +75,28 @@ Begin["`Private`"]; (* OGRe`Private` *)
 
 
 (* DO NOT change the format of the next line. It is used by TCheckForUpdates to detect the version of this file. Changing it will break the automatic update mechanism. Only change the version number and date. *)
-OGReVersion = "v1.3 (May 6, 2021)";
+OGReVersion = "v1.4 (2021-05-09)";
 
 
 (* The raw URL of this file on GitHub. *)
 OGReURL = "https://raw.githubusercontent.com/bshoshany/OGRe/master/OGRe.m";
 
 
-(* This module creates a clickable button that looks and behaves like a hyperlink. *)
-CreateButton[label_, action_] := Button[
-    MouseAppearance[Mouseover[
-        Style[label, "Hyperlink"],
-        Style[label, "HyperlinkActive"]
-    ], "LinkHand"],
-    action,
-    Appearance -> "Frameless",
-    BaseStyle -> "Hyperlink"
-];
-Attributes[CreateButton] = HoldRest;
-
-
-(* This module prints an expression in an uneditable cell with the label OGRe. *)
-OGRePrint[expression_] := CellPrint[ExpressionCell[expression, "Output", Editable -> False, CellLabel -> "OGRe:", CellLabelStyle -> Directive["CellLabel", Smaller, Blue]]];
-OGRePrint[expressions__] := OGRePrint[Row[{expressions}]];
-
-
-(* Print a welcome message at startup. *)
-OGRePrint[Column[{
-    Style[Row[{"OGRe: An ", Style["O", Underlined], "bject-Oriented ", Style["G", Underlined], "eneral ", Style["Re", Underlined], "lativity Package for Mathematica"}], Bold, Larger],
-    Style[Row[{"By Barak Shoshany (", Hyperlink["baraksh@gmail.com", "mailto:baraksh@gmail.com"], ") (", Hyperlink["baraksh.com", "https://baraksh.com/"], ")"}], Bold],
-    Style[Row[{OGReVersion}], Bold],
-    Style[Row[{"GitHub repository: ", Hyperlink["https://github.com/bshoshany/OGRe"]}], Bold],
-    Row[{"\[Bullet] To check if a new version is available, type ", Style["TCheckForUpdates[]", "Input"], " or ", CreateButton["click here.", TCheckForUpdates[]]}],
-    Row[{"\[Bullet] To view the full documentation for the package, type ", Style["TDocs[]", "Input"], " or ", CreateButton["click here.", TDocs[]]}],
-    Row[{"\[Bullet] To list all available modules, type ", Style["?OGRe`*", "Input"], " or ", CreateButton["click here.", OGRePrint[Information["OGRe`*"]]]}],
-    Row[{"\[Bullet] To get help on a particular module, type ", Style["?", "Input"], " followed by the module name."}],
-    Row[{"\[Bullet] To enable the new parallelization feature, type ", Style["TParallelize[True]", "Input"], " or ", CreateButton["click here.", TParallelize[True]]}]
-}]];
-
-
-(* A special key in TensorData, Options, is used to store information about the current session, for the purpose of exporting and importing between sessions using TExportAll and TImportAll. Since this key is not a string, it cannot be accidentally overwritten by a tensor definition. *)
-DefaultIndexLetters = "\[Mu]\[Nu]\[Rho]\[Sigma]\[Kappa]\[Lambda]\[Alpha]\[Beta]\[Gamma]\[Delta]\[CurlyEpsilon]\[Zeta]\[Epsilon]\[Theta]\[Iota]\[Xi]\[Pi]\[Tau]\[Phi]\[Chi]\[Psi]\[Omega]";
-PopulateOptions[] := Module[
-    {
-        useIndexLetters,
-        useParallelize,
-        useSimplifyAssumptions
-    },
-    If[
-        !KeyExistsQ[TensorData, Options],
-    (* Then *)
-        (* If the Options key doesn't exist, which can happen when the package first loads or when importing from an old version of OGRe, create it with the default values. *)
-        TensorData[Options] = Association[
-            "OGReVersion" -> OGReVersion,
-            "IndexLetters" -> DefaultIndexLetters,
-            "Parallelize" -> False,
-            "SimplifyAssumptions" -> Association[
-                "AssumeReal" -> True,
-                "User" -> None
-            ]
-        ],
-    (* Else *)
-        (* If the Options key does exist, populate it with the imported values, but substitute the default values if any keys are missing, which can happen when importing from a different version of OGRe. *)
-        useIndexLetters = Lookup[TensorData[Options], "IndexLetters", DefaultIndexLetters];
-        useParallelize = Lookup[TensorData[Options], "Parallelize", False];
-        If[
-            KeyExistsQ[TensorData[Options], "SimplifyAssumptions"],
-        (* Then *)
-            useSimplifyAssumptions = Association[
-                "AssumeReal" -> Lookup[TensorData[Options]["SimplifyAssumptions"], "AssumeReal", True],
-                "User" -> Lookup[TensorData[Options]["SimplifyAssumptions"], "User", None]
-            ],
-        (* Else *)
-            useSimplifyAssumptions = Association[
-                "AssumeReal" -> True,
-                "User" -> None
-            ]
-        ];
-        TensorData[Options] = Association[
-            "OGReVersion" -> OGReVersion,
-            "IndexLetters" -> useIndexLetters,
-            "Parallelize" -> useParallelize,
-            "SimplifyAssumptions" -> useSimplifyAssumptions
-        ];
-    ];
-];
-PopulateOptions[];
-
-
-(* Create a nicely-formatted usage message. *)
-CreateUsageMessage[f_, args_List, msg_String, additional_List : {}] := Module[
-    {
-        allArgs = Join[args, additional]
-    },
-    Evaluate[f::usage] = ToString[TextCell[Row[{
-        ToString[f],
-        "[",
-        Splice[(Style[#, Bold] &)/@ Riffle[args, ", "]],
-        "] ",
-        Splice[StringSplit[msg, "`"] /. (ToString[#] -> Style[allArgs[[#]], Bold] & /@ Range[1, Length[allArgs]])]
-        }]],
-        StandardForm
-    ];
-];
-
-
 (* ===================================================
    Public modules (accessible to the user) start here.
    =================================================== *)
 
-CreateUsageMessage[TAddCoordTransformation, {sourceID, targetID, rules}, "adds a transformation from the coordinate system `1` to the coordinate system `2`.
-The argument `3` must be a list of transformation rules. For example, {x \[Rule] r Sin[\[Theta]] Cos[\[Phi]], y \[Rule] r Sin[\[Theta]] Sin[\[Phi]], z \[Rule] r Cos[\[Theta]]} is a transformation from Cartesian to spherical coordinates."];
+
+(* Create a nicely-formatted usage message. *)
+CreateUsageMessage[f_, msg_String : {}] := Evaluate[f::usage] = ToString[TextCell[Row[Flatten[{List @@ StringReplace[msg, {"`" ~~ (x : Shortest[__]) ~~ "`" :> Style[x, Bold]}]}]]], StandardForm];
+
+
+CreateUsageMessage[TAddCoordTransformation, "TAddCoordTransformation[`sourceID` \[Rule] `targetID`, `rules`] adds a transformation from the coordinate system `sourceID` to the coordinate system `targetID`.
+`rules` must be a list of transformation rules. For example, {x \[Rule] r Sin[\[Theta]] Cos[\[Phi]], y \[Rule] r Sin[\[Theta]] Sin[\[Phi]], z \[Rule] r Cos[\[Theta]]} is a transformation from Cartesian to spherical coordinates."];
 TAddCoordTransformation::ErrorRulesForm = "The transformation rules must be a list of rules of the form x \[Rule] y.";
 TAddCoordTransformation::ErrorDifferentCoords = "The source and target coordinate systems must be different.";
 TAddCoordTransformation::ErrorNotSameDim = "The source and target coordinate systems must be of the same dimension.";
+TAddCoordTransformation[sourceID_String -> targetID_String, rules_List] := TAddCoordTransformation[sourceID, targetID, rules];
 TAddCoordTransformation[sourceID_String, targetID_String, rules_List] := Module[
     {
         allJacobians,
@@ -271,14 +183,14 @@ TAddCoordTransformation[sourceID_String, targetID_String, rules_List] := Module[
 
 DefaultResultID = "Result";
 DefaultSymbol = "\[DottedSquare]";
-CreateUsageMessage[TCalc, {LHSTensorID[LHSIndices], RHSExpression, symbol}, "calculates a tensor formula.
-`2` may include any number of tensors in the format `4`[`5`], where `4` is a tensor object and `5` is a string representing the order of indices, along with any combination of the following operations:
+CreateUsageMessage[TCalc, "TCalc[`formula`] calculates a tensor `formula`, which may involve any number of tensors in the format `ID`[`indices`], where `ID` is a tensor object and `indices` is a string representing the order of indices, along with any combination of the following operations:
 \[Bullet] Addition: For example, \"A\"[\"\[Mu]\[Nu]\"] + \"B\"[\"\[Mu]\[Nu]\"].
 \[Bullet] Contraction: For example, \"A\"[\"\[Mu]\[Lambda]\"] . \"B\"[\"\[Lambda]\[Nu]\"].
 \[Bullet] Multiplication by scalar: For example, 2 * \"A\"[\"\[Mu]\[Nu]\"].
-`6` specifies the ID of the tensor object in which to store the result. If omitted, the ID \"" <> DefaultResultID <> "\" will be used.
-`7` specifies the order of indices of the resulting tensor. The indices must be a permutation of the free indices of `2`. If omitted, the indices will be in the same order as they appear in `2`. If `6` is omitted, then `7` must be omitted as well.
-`3` specifies the symbol to use for the result. If omitted, the placeholder symbol " <> DefaultSymbol <> " will be used.", {ID, indices, LHSTensorID, LHSIndices}];
+TCalc[`targetID`[`targetIndices`], `formula`, `symbol`] calculates a tensor `formula` and stores the result in a new tensor object.
+`targetID` specifies the ID of the tensor object in which to store the result. If omitted, the ID \"" <> DefaultResultID <> "\" will be used.
+`targetIndices` specifies the order of indices of the resulting tensor. The indices must be a permutation of the free indices of `formula`. If omitted, the indices are assumed to be in the same order as they appear in `formula`.
+`symbol` specifies the symbol to use for the resulting tensor. If omitted, the placeholder symbol " <> DefaultSymbol <> " will be used."];
 TCalc::ErrorIndices = "The LHS index specification \"`1`\" and the RHS index specification \"`2`\" must be the same up to permutation.";
 TCalc::ErrorResult = "Invalid tensor expression obtained: `1`. Please check that the tensor expression you entered contains only tensor references of the form \"ID\"[\"indices\"] combined using addition, contraction (dot product), or multiplication by scalar."
 TCalc[RHSExpression_, symbol_String : DefaultSymbol] := TCalc[DefaultResultID[""], RHSExpression, symbol];
@@ -300,6 +212,12 @@ TCalc[LHSTensorID_String[LHSIndices_String], RHSExpression_, symbol_String : Def
         useCoords,
         useIndices
     },
+    (* Check that the tensor LHSTensorID doesn't already exist, but only if it's not the default ID. *)
+    If[
+        LHSTensorID =!= DefaultResultID,
+    (* Then *)
+        CheckIfOverwriting[LHSTensorID];
+    ];
     (* Record the initial leaf count of the expression to be calculated. It will be used to advance the progress bar, since the leaf count decreases with (almost) every operation. *)
     leafCount = LeafCount[RHSExpression];
     (* Define the rules for computing tensor formulas. *)
@@ -404,7 +322,186 @@ TCalc[LHSTensorID_String[LHSIndices_String], RHSExpression_, symbol_String : Def
 ];
 
 
-CreateUsageMessage[TChangeDefaultCoords, {tensorID,  coordinatesID}, "changes the default coordinate system of the tensor object `1` to `2`."];
+CreateUsageMessage[TCalcChristoffel, "TCalcChristoffel[`metricID`] calculates the Christoffel symbols (the coefficients of the Levi-Civita connection) from the metric `metricID` and stores the result in a new tensor object with ID \"`metricID`Christoffel\". Note that the Christoffel symbols are not the components of a tensor, but this tensor object will know to transform according to the correct rules under change of coordinates."];
+TCalcChristoffel::ErrorNotMetric = "The Christoffel symbols can only be calculated from a tensor object representing a metric.";
+TCalcChristoffel[metricID_String] := Module[
+    {
+        christoffelID,
+        inverseMetricID = NewTempID[]
+    },
+    (* Check that the tensor does not already exist. *)
+    CheckIfOverwriting[metricID <> "Christoffel"];
+    (* Check that metricID is indeed a metric. *)
+    If[
+        TensorData[metricID]["Role"] =!= "Metric",
+    (* Then *)
+        Message[TCalcChristoffel::ErrorNotMetric];
+        Abort[];
+    ];
+    (* Create a temporary tensor for the inverse metric, with two upper indices as its default configuration, to force the Christoffel symbols to have the correct index configuration. We do this to increase performance, since if we don't, then we'll have to raise the first index later, which is a costly operation. *)
+    SetTensorID[inverseMetricID, Association[
+        "Components" -> TensorData[metricID]["Components"],
+        "DefaultCoords" -> TensorData[metricID]["DefaultCoords"],
+        "DefaultIndices" -> {1, 1},
+        "Metric" -> TensorData[metricID]["Metric"],
+        "Role" -> "Temporary",
+        "Symbol" -> Superscript[TensorData[metricID]["Symbol"], "\[Lambda]\[Sigma]"]
+    ]];
+    (* Calculate the Christoffel symbols, and give the tensor object the correct ID and symbol. *)
+    christoffelID = TCalc[
+        (metricID <> "Christoffel")["\[Lambda]\[Mu]\[Nu]"],
+        1/2 inverseMetricID["\[Lambda]\[Sigma]"] . (
+            TPartialD["\[Mu]"] . metricID["\[Nu]\[Sigma]"] +
+            TPartialD["\[Nu]"] . metricID["\[Sigma]\[Mu]"] -
+            TPartialD["\[Sigma]"] . metricID["\[Mu]\[Nu]"]
+        ),
+        "\[CapitalGamma]"
+    ];
+    (* Set the role of the tensor to Christoffel, so that OGRe will know to transform it as a connection and not as a tensor. *)
+    ChangeTensorKey[christoffelID, "Role", "Christoffel"];
+    Return[christoffelID];
+];
+
+
+CreateUsageMessage[TCalcEinsteinTensor, "TCalcEinsteinTensor[`metricID`] calculates the Einstein tensor from the metric `metricID` and stores the result in a new tensor object with ID \"`metricID`Einstein\". If a tensor with ID \"`metricID`RicciTensor\" exists, it will be assumed to be the Ricci tensor of the metric, and will be used in the calculation. Otherwise, \"`metricID`RicciTensor\" will be created using TCalcRicciTensor[]."];
+TCalcEinsteinTensor::ErrorNotMetric = "The Einstein tensor can only be calculated from a tensor object representing a metric.";
+TCalcEinsteinTensor[metricID_String] := Module[
+    {
+        EinsteinID
+    },
+    (* Check that the tensor does not already exist. *)
+    CheckIfOverwriting[metricID <> "Einstein"];
+    (* Check that metricID is indeed a metric. *)
+    If[
+        TensorData[metricID]["Role"] =!= "Metric",
+    (* Then *)
+        Message[TCalcEinsteinTensor::ErrorNotMetric];
+        Abort[];
+    ];
+    (* If the Ricci tensor was not already calculated, calculate it now. *)
+    If[
+        !KeyExistsQ[TensorData, metricID <> "RicciTensor"],
+    (* Then *)
+        TCalcRicciTensor[metricID];
+    ];
+    (* Calculate the Einstein tensor, and give the tensor object the correct ID and symbol. *)
+    EinsteinID = TCalc[
+        (metricID <> "Einstein")["\[Mu]\[Nu]"],
+        (metricID <> "RicciTensor")["\[Mu]\[Nu]"] - 1/2 metricID["\[Mu]\[Nu]"] . (metricID <> "RicciTensor")["\[Rho]\[Rho]"],
+        "G"
+    ];
+    (* Set the role of the tensor to Einstein for future reference. *)
+    ChangeTensorKey[EinsteinID, "Role", "Einstein"];
+    Return[EinsteinID];
+];
+
+
+CreateUsageMessage[TCalcRicciScalar, "TCalcRicciScalar[`metricID` calculates the Ricci scalar from the metric `metricID` and stores the result in a new tensor object with ID \"`metricID`RicciScalar\". If a tensor with ID \"`metricID`RicciTensor\" exists, it will be assumed to be the Ricci tensor of the metric, and will be used in the calculation. Otherwise, \"`metricID`RicciTensor\" will be created using TCalcRicciTensor[]."];
+TCalcRicciScalar::ErrorNotMetric = "The Ricci scalar can only be calculated from a tensor object representing a metric.";
+TCalcRicciScalar[metricID_String] := Module[
+    {
+        RicciScalarID
+    },
+    (* Check that the tensor does not already exist. *)
+    CheckIfOverwriting[metricID <> "RicciScalar"];
+    (* Check that metricID is indeed a metric. *)
+    If[
+        TensorData[metricID]["Role"] =!= "Metric",
+    (* Then *)
+        Message[TCalcRicciScalar::ErrorNotMetric];
+        Abort[];
+    ];
+    (* If the Ricci tensor was not already calculated, calculate it now. *)
+    If[
+        !KeyExistsQ[TensorData, metricID <> "RicciTensor"],
+    (* Then *)
+        TCalcRicciTensor[metricID];
+    ];
+    (* Calculate the Ricci scalar, and give the tensor object the correct ID and symbol. *)
+    RicciScalarID = TCalc[
+        (metricID <> "RicciScalar")[""],
+        (metricID <> "RicciTensor")["\[Mu]\[Mu]"],
+        "R"
+    ];
+    (* Set the role of the tensor to Ricci Scalar for future reference. *)
+    ChangeTensorKey[RicciScalarID, "Role", "Ricci Scalar"];
+    Return[RicciScalarID];
+];
+
+
+CreateUsageMessage[TCalcRicciTensor, "TCalcRicciTensor[`metricID`] calculates the Ricci tensor from the metric `metricID` and stores the result in a new tensor object with ID \"`metricID`RicciTensor\". If a tensor with ID \"`metricID`Riemann\" exists, it will be assumed to be the Riemann tensor of the metric, and will be used in the calculation. Otherwise, \"`metricID`Riemann\" will be created using TCalcRiemannTensor[]."];
+TCalcRicciTensor::ErrorNotMetric = "The Ricci tensor can only be calculated from a tensor object representing a metric.";
+TCalcRicciTensor[metricID_String] := Module[
+    {
+        RicciTensorID
+    },
+    (* Check that the tensor does not already exist. *)
+    CheckIfOverwriting[metricID <> "RicciTensor"];
+    (* Check that metricID is indeed a metric. *)
+    If[
+        TensorData[metricID]["Role"] =!= "Metric",
+    (* Then *)
+        Message[TCalcRicciTensor::ErrorNotMetric];
+        Abort[];
+    ];
+    (* If the Riemann tensor was not already calculated, calculate it now. *)
+    If[
+        !KeyExistsQ[TensorData, metricID <> "Riemann"],
+    (* Then *)
+        TCalcRiemannTensor[metricID];
+    ];
+    (* Calculate the Ricci tensor, and give the tensor object the correct ID and symbol. *)
+    RicciTensorID = TCalc[
+        (metricID <> "RicciTensor")["\[Mu]\[Nu]"],
+        (metricID <> "Riemann")["\[Lambda]\[Mu]\[Lambda]\[Nu]"],
+        "R"
+    ];
+    (* Set the role of the tensor to Ricci Tensor for future reference. *)
+    ChangeTensorKey[RicciTensorID, "Role", "Ricci Tensor"];
+    Return[RicciTensorID];
+];
+
+
+CreateUsageMessage[TCalcRiemannTensor, "TCalcRiemannTensor[`metricID`] calculates the Riemann tensor from the metric `metricID` and stores the result in a new tensor object with ID \"`metricID`Riemann\". If a tensor with ID \"`metricID`Christoffel\" exists, it will be assumed to be the Christoffel symbols of the metric, and will be used in the calculation. Otherwise, \"`metricID`Christoffel\" will be created using TCalcChristoffel[]."];
+TCalcRiemannTensor::ErrorNotMetric = "The Riemann tensor can only be calculated from a tensor object representing a metric.";
+TCalcRiemannTensor[metricID_String] := Module[
+    {
+        RiemannID
+    },
+    (* Check that the tensor does not already exist. *)
+    CheckIfOverwriting[metricID <> "Riemann"];
+    (* Check that metricID is indeed a metric. *)
+    If[
+        TensorData[metricID]["Role"] =!= "Metric",
+    (* Then *)
+        Message[TCalcRiemannTensor::ErrorNotMetric];
+        Abort[];
+    ];
+    (* If the Christoffel symbols were not already calculated, calculate them now. *)
+    If[
+        !KeyExistsQ[TensorData, metricID <> "Christoffel"],
+    (* Then *)
+        TCalcChristoffel[metricID];
+    ];
+    (* Calculate the Riemann tensor, and give the tensor object the correct ID, symbol, and default index configuration. *)
+    RiemannID = TChangeDefaultIndices[
+        TCalc[
+            (metricID <> "Riemann")["\[Rho]\[Sigma]\[Mu]\[Nu]"],
+            TPartialD["\[Mu]"] . (metricID <> "Christoffel")["\[Rho]\[Nu]\[Sigma]"] -
+            TPartialD["\[Nu]"] . (metricID <> "Christoffel")["\[Rho]\[Mu]\[Sigma]"] +
+            (metricID <> "Christoffel")["\[Rho]\[Mu]\[Lambda]"] . (metricID <> "Christoffel")["\[Lambda]\[Nu]\[Sigma]"] -
+            (metricID <> "Christoffel")["\[Rho]\[Nu]\[Lambda]"] . (metricID <> "Christoffel")["\[Lambda]\[Mu]\[Sigma]"],
+            "R"
+        ],
+        {1,-1,-1,-1}
+    ];
+    (* Set the role of the tensor to Riemann for future reference. *)
+    ChangeTensorKey[RiemannID, "Role", "Riemann"];
+    Return[RiemannID];
+];
+
+
+CreateUsageMessage[TChangeDefaultCoords, "TChangeDefaultCoords[`tensorID`, `coordinatesID`] changes the default coordinate system of the tensor object `tensorID` to `coordinatesID`."];
 TChangeDefaultCoords::ErrorCoordTensor = "Cannot change the default coordinate system for a tensor object representing a coordinate system."
 TChangeDefaultCoords[tensorID_String, coordinatesID_String] := (
     (* Check that the tensor objects sourceID and coordinatesID exist. *)
@@ -427,8 +524,8 @@ TChangeDefaultCoords[tensorID_String, coordinatesID_String] := (
 );
 
 
-CreateUsageMessage[TChangeDefaultIndices, {ID, indices}, "changes the default index configuration of the tensor object `1` to `2`.
-`2` is a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index."];
+CreateUsageMessage[TChangeDefaultIndices, "TChangeDefaultIndices[`ID`, `indices`] changes the default index configuration of the tensor object `ID` to `indices`.
+`indices` must be a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index."];
 TChangeDefaultIndices::ErrorCoords = "Cannot change the default index configuration for a tensor object representing a coordinate system."
 TChangeDefaultIndices::ErrorMetric = "Cannot change the default index configuration for a tensor object representing a metric."
 TChangeDefaultIndices::ErrorChristoffel = "Cannot change the default index configuration for a tensor object representing a Levi-Civita connection (Christoffel symbols)."
@@ -466,11 +563,14 @@ TChangeDefaultIndices[ID_String, indices_List] := (
 );
 
 
-CreateUsageMessage[TChangeID, {oldID, newID}, "changes the ID of the tensor object `1` to `2`.
-If the tensor is a metric or a coordinate system, all currently defined tensors will be scanned, and any references to `1` will be replaced with `2`. If a tensor with the ID `2` already exists, it will be overwritten."];
+CreateUsageMessage[TChangeID, "TChangeID[`oldID` \[Rule] `newID`] changes the ID of the tensor object `oldID` to `newID`.
+If the tensor is a metric or a coordinate system, all currently defined tensors will be scanned, and any references to `oldID` will be replaced with `newID`."];
+TChangeID[oldID_String -> newID_String] := TChangeID[oldID, newID];
 TChangeID[oldID_String, newID_String] := (
     (* Check that the tensor object oldID exists. *)
     CheckIfTensorExists[oldID];
+    (* Check that the tensor object newID doesn't already exist. *)
+    CheckIfOverwriting[newID];
     (* Copy the old tensor data to the new ID and then remove the old ID. *)
     SetTensorID[newID, TensorData[oldID]];
     RemoveTensorID[oldID];
@@ -496,7 +596,7 @@ TChangeID[oldID_String, newID_String] := (
 );
 
 
-CreateUsageMessage[TChangeSymbol, {ID, symbol}, "changes the symbol of the tensor object `1` to `2`."];
+CreateUsageMessage[TChangeSymbol, "TChangeSymbol[`ID`, `symbol`] changes the symbol of the tensor object `ID` to `symbol`."];
 TChangeSymbol[ID_String, symbol_String] := (
     CheckIfTensorExists[ID];
     ChangeTensorKey[ID, "Symbol", symbol];
@@ -504,7 +604,7 @@ TChangeSymbol[ID_String, symbol_String] := (
 );
 
 
-CreateUsageMessage[TCheckForUpdates, {}, "checks the GitHub repository for new versions of this package. If a new version is available, the user will be given the option to download or install it."];
+CreateUsageMessage[TCheckForUpdates, "TCheckForUpdates[] checks the GitHub repository for new versions of this package. If a new version is available, the user will be given the option to download or install it."];
 TCheckForUpdates[] := Module[
     {
         errorMessage,
@@ -550,7 +650,7 @@ TCheckForUpdates[] := Module[
                     "Download new version to " <> FileNameJoin[{NotebookDirectory[], "OGRe.m"}] <> " and reload the package.",
                     URLDownload[OGReURL, FileNameJoin[{NotebookDirectory[], "OGRe.m"}]]; OGRePrint["Downloaded! Reloading..."]; Get[FileNameJoin[{NotebookDirectory[], "OGRe.m"}]]
                 ]}]];
-            ]
+            ];
             On[NotebookDirectory::nosv];
             AppendTo[toPrint, Row[{"\[Bullet] ", CreateButton[
                 "Install new version to " <> FileNameJoin[{$UserBaseDirectory, "Applications", "OGRe.m"}] <> " and reload the package.",
@@ -564,49 +664,7 @@ TCheckForUpdates[] := Module[
 ];
 
 
-CreateUsageMessage[TChristoffel, {metricID}, "calculates the Christoffel symbols (the coefficients of the Levi-Civita connection) from the metric `1` and stores the result in a new tensor object with ID \"`1`Christoffel\".
-Note that the connection is not a tensor, and does not transform like a tensor when changing coordinates. \"`1`Christoffel\" will be a special tensor object which transforms according to the appropriate rules. Therefore, one should only calculate the Christoffel symbols using this module. A manual calculation with TCalc[ ] will result in a tensor object with the wrong transformation rules."];
-TChristoffel::ErrorNotMetric = "The Christoffel symbols can only be calculated from a tensor object representing a metric.";
-TChristoffel[metricID_String] := Module[
-    {
-        christoffelID,
-        inverseMetricID = NewTempID[]
-    },
-    (* Check that metricID is indeed a metric. *)
-    If[
-        TensorData[metricID]["Role"] =!= "Metric",
-    (* Then *)
-        Message[TChristoffel::ErrorNotMetric];
-        Abort[];
-    ];
-    (* Create a temporary tensor for the inverse metric, with two upper indices as its default configuration, to force the Christoffel symbols to have the correct index configuration. We do this to increase performance, since if we don't, then we'll have to raise the first index later, which is a costly operation. *)
-    SetTensorID[inverseMetricID, Association[
-        "Components" -> TensorData[metricID]["Components"],
-        "DefaultCoords" -> TensorData[metricID]["DefaultCoords"],
-        "DefaultIndices" -> {1, 1},
-        "Metric" -> TensorData[metricID]["Metric"],
-        "Role" -> "Temporary",
-        "Symbol" -> Superscript[TensorData[metricID]["Symbol"], "\[Lambda]\[Sigma]"]
-    ]];
-    (* Calculate the Christoffel symbols, and give the tensor object the correct ID and symbol. *)
-    christoffelID = TCalc[
-        (metricID <> "Christoffel")["\[Lambda]\[Mu]\[Nu]"],
-        1/2 inverseMetricID["\[Lambda]\[Sigma]"] . (
-            TPartialD["\[Mu]"] . metricID["\[Nu]\[Sigma]"] +
-            TPartialD["\[Nu]"] . metricID["\[Sigma]\[Mu]"] -
-            TPartialD["\[Sigma]"] . metricID["\[Mu]\[Nu]"]
-        ),
-        "\[CapitalGamma]"
-    ];
-    (* Set the role of the tensor to Christoffel, so that OGRe will know to transform it as a connection and not as a tensor. *)
-    ChangeTensorKey[christoffelID, "Role", "Christoffel"];
-    Return[christoffelID];
-];
-
-
-CreateUsageMessage[TDelete, {ID}, "deletes the tensor object `1`.
-WARNING: The tensor data will be lost forever and cannot be recovered.
-If the tensor is a metric or coordinate system, it cannot be deleted unless all tensors referring to it have been deleted first."];
+CreateUsageMessage[TDelete, "TDelete[`ID`] permanently deletes the tensor object `ID`. If the tensor is a metric or coordinate system, it cannot be deleted unless all tensors referring to it have been deleted first."];
 TDelete::ErrorMetric = "The metric \"`1`\" cannot be deleted, as it has been used to define the tensor \"`2`\". To delete the metric, first delete \"`2`\" and any other tensors defined using this metric.";
 TDelete::ErrorCoords = "The coordinate system \"`1`\" cannot be deleted, as it is the default coordinate system of the tensor \"`2`\". To delete the coordinate system, first change the default coordinate system of \"`2`\" and any other relevant tensors.";
 TDelete[ID_String] := (
@@ -644,7 +702,7 @@ TDelete[ID_String] := (
 );
 
 
-CreateUsageMessage[TDocs, {}, " opens the Mathematica notebook OGRe_Documentation.nb from the GitHub repository, which contains the full documentation for the package."];
+CreateUsageMessage[TDocs, "TDocs[] opens the Mathematica notebook OGRe_Documentation.nb from the GitHub repository, which contains the full documentation for the package."];
 TDocs[] := (
     If[
         NotebookOpen["https://raw.githubusercontent.com/bshoshany/OGRe/master/OGRe_Documentation.nb"] === $Failed,
@@ -656,39 +714,7 @@ TDocs[] := (
 );
 
 
-CreateUsageMessage[TEinsteinTensor, {metricID}, "calculates the Einstein tensor from the metric `1` and stores the result in a new tensor object with ID \"`1`Einstein\".
-If a tensor with ID \"`1`RicciTensor\" exists, it will be assumed to be the Ricci tensor of the metric, and will be used in the calculation. Otherwise, \"`1`RicciTensor\" will be created using TRicciTensor[ ]."];
-TEinsteinTensor::ErrorNotMetric = "The Einstein tensor can only be calculated from a tensor object representing a metric.";
-TEinsteinTensor[metricID_String] := Module[
-    {
-        EinsteinID
-    },
-    (* Check that metricID is indeed a metric. *)
-    If[
-        TensorData[metricID]["Role"] =!= "Metric",
-    (* Then *)
-        Message[TEinsteinTensor::ErrorNotMetric];
-        Abort[];
-    ];
-    (* If the Ricci tensor was not already calculated, calculate it now. *)
-    If[
-        !KeyExistsQ[TensorData, metricID <> "RicciTensor"],
-    (* Then *)
-        TRicciTensor[metricID];
-    ];
-    (* Calculate the Einstein tensor, and give the tensor object the correct ID and symbol. *)
-    EinsteinID = TCalc[
-        (metricID <> "Einstein")["\[Mu]\[Nu]"],
-        (metricID <> "RicciTensor")["\[Mu]\[Nu]"] - 1/2 metricID["\[Mu]\[Nu]"] . (metricID <> "RicciTensor")["\[Rho]\[Rho]"],
-        "G"
-    ];
-    (* Set the role of the tensor to Einstein for future reference. *)
-    ChangeTensorKey[EinsteinID, "Role", "Einstein"];
-    Return[EinsteinID];
-];
-
-
-CreateUsageMessage[TExport, {ID}, "exports the raw tensor data for the tensor object `1` as an Association."];
+CreateUsageMessage[TExport, "TExport[`ID`] exports the raw tensor data for the tensor object `ID` as an Association."];
 TExport[ID_String] := (
     CheckIfTensorExists[ID];
     Return[Association[
@@ -697,8 +723,8 @@ TExport[ID_String] := (
 );
 
 
-CreateUsageMessage[TExportAll, {filename}, "exports the raw tensor data for all tensors defined in the current session as an Association.
-`1` is optional. If specified, the data is exported to a file with this name. If a full path is not given, the file will be created in the current working directory, as given by Directory[ ]. This directory can be changed using SetDirectory[ ]. Note that the file will be overwritten if it already exists."];
+CreateUsageMessage[TExportAll, "TExportAll[] exports the raw tensor data for all tensors defined in the current session as an Association.
+TExportAll[`filename`] exports the data to `filename`. If a full path is not given, the file will be created in the current working directory, as given by Directory[]. This directory can be changed using SetDirectory[]. Note that the file will be overwritten if it already exists."];
 TExportAll[] := TensorData;
 TExportAll[filename_String] := Module[
     {
@@ -711,9 +737,8 @@ TExportAll[filename_String] := Module[
 ];
 
 
-CreateUsageMessage[TGetComponents, {ID, indices, coordinatesID}, "extracts the components of the tensor object `1` with the index configuration `2` and in the coordinate system `3` as a regular Mathematica List.
-`2` should be a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index.
-The index configuration and/or coordinate system cannot be omitted; there are no default values. This is to ensure that the user always knows which representation is being extracted."];
+CreateUsageMessage[TGetComponents, "TGetComponents[`ID`, `indices`, `coordinatesID`] extracts the components of the tensor object `ID` with the index configuration `indices` and in the coordinate system `coordinatesID` as a list.
+`indices` must be a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index. The index configuration and coordinate system cannot be omitted; there are no default values. This is to ensure that the user always knows exactly which representation is being extracted."];
 TGetComponents::ErrorRank = "The number of indices must match the rank of the tensor.";
 TGetComponents[ID_String, indices_List, coordinatesID_String] := (
     (* Check that the tensor object ID exists. *)
@@ -735,27 +760,26 @@ TGetComponents[ID_String, indices_List, coordinatesID_String] := (
 );
 
 
-CreateUsageMessage[TImport, {data}, "imports a tensor that has been exported using TExport[ ].
-WARNING:
-1. The data is assumed to not have been manually modified by the user, so it is NOT checked for errors or inconsistencies. Importing tensor data that has been manually modified may cause errors or unexpected results, and should be avoided.
-2. The ID of the tensor will be taken from the name of the (single) key of the Association being imported. If a tensor with the same ID already exists, it will be overwritten."];
-TImport[data_Association] := (
+CreateUsageMessage[TImport, "TImport[`data`] imports a tensor that has been exported using TExport[]."];
+TImport[data_Association] := Module[
+    {
+        newID
+    },
+    newID = Keys[data][[1]];
     If[
         !KeyExistsQ[data[[1]], "OGReVersion"] || data[[1]]["OGReVersion"] != OGReVersion,
     (* Then *)
         OGRePrint["Warning: The imported tensor was created in a different version of OGRe. Compatibility issues may occur."];
-    ]
-    SetTensorID[Keys[data][[1]], KeyDrop[Values[data][[1]], "OGReVersion"]];
-    Return[Keys[data][[1]]];
-);
+    ];
+    (* Check that the imported tensor object doesn't already exist. *)
+    CheckIfOverwriting[newID];
+    SetTensorID[newID, KeyDrop[Values[data][[1]], "OGReVersion"]];
+    Return[newID];
+];
 
 
-CreateUsageMessage[TImportAll, {source}, "imports tensor data that has been exported using TExportAll[ ].
-If `1` is an Association, imports the data directly.
-If `1` is a file name, imports the data from that file. If a full path is not given, the file should be located in the current working directory, as given by Directory[ ]. This directory can be changed using SetDirectory[ ].
-WARNING:
-1. The data is assumed to not have been manually modified by the user, so it is NOT checked for errors or inconsistencies. Importing tensor data that has been manually modified may cause errors or unexpected results, and should be avoided.
-2. This will irreversibly delete ALL of the tensors already defined in the current session."];
+CreateUsageMessage[TImportAll, "TImportAll[`source`] imports tensor data that has been exported using TExportAll[]. If `source` is an Association, imports the data directly. If `source` is a file name, imports the data from that file. If a full path is not given, the file is assumed to be located in the current working directory, as given by Directory[]. This directory can be changed using SetDirectory[].
+`WARNING: This will irreversibly delete ALL of the tensors already defined in the current session.`"];
 TImportAll::ErrorFile = "The file `1` does not exist.";
 TImportAll[data_Association] := ImportTensorData[data];
 TImportAll[filename_String] := Module[
@@ -777,21 +801,9 @@ TImportAll[filename_String] := Module[
 ];
 
 
-CreateUsageMessage[TIndexLetters, {letters}, "changes the letters to be used when displaying indices.
-If `1` is omitted, shows the index letters currently in use.
-If `1` is set to Automatic, resets the index letters to the default (lowercase Greek letters)."];
-TIndexLetters[] := TensorData[Options]["IndexLetters"];
-TIndexLetters[letters_String] := (
-    Unprotect[TensorData];
-    TensorData[Options]["IndexLetters"] = letters;
-    Protect[TensorData];
-);
-TIndexLetters[Automatic] := TIndexLetters[DefaultIndexLetters];
-
-
-CreateUsageMessage[TInfo, {ID}, "displays information about the tensor object `1`, including its symbol, role, associated metric, and default coordinates and indices, in human-readable form.
-If `1` represents a coordinate system, displays a list of all tensors using it as their default coordinate system.
-If `1` represents a metric, displays a list of all tensors using it as their associated metric."];
+CreateUsageMessage[TInfo, "TInfo[`ID`] displays information about the tensor object `ID`, including its symbol, role, associated metric, and default coordinates and indices, in human-readable form.
+If `ID` represents a coordinate system, displays a list of all tensors using it as their default coordinate system.
+If `ID` represents a metric, displays a list of all tensors using it as their associated metric."];
 TInfo[ID_String] := Module[
     {
         info
@@ -805,14 +817,13 @@ TInfo[ID_String] := Module[
     If[TensorData[ID]["Role"] =!= "Coordinates" && TensorData[ID]["Role"] =!= "Metric", AppendTo[info, Row[{Style["Metric: ", Bold], TensorData[ID]["Metric"]}]]];
     If[TensorData[ID]["Role"] =!= "Coordinates", AppendTo[info, Row[{Style["Default Coordinates: ", Bold], TensorData[ID]["DefaultCoords"]}]]];
     AppendTo[info, Row[{Style["Default Indices: ", Bold], TensorData[ID]["DefaultIndices"]}]];
-    If[TensorData[ID]["Role"] === "Coordinates", AppendTo[info, Row[{Style["Default Coordinates For: ", Bold], Row[Select[Keys[TensorData], TensorData[#]["DefaultCoords"] === ID && # =!= ID &], ", "]}]]];
+    If[TensorData[ID]["Role"] === "Coordinates", AppendTo[info, Row[{Style["Used as Default Coordinates For: ", Bold], Row[Select[Keys[TensorData], TensorData[#]["DefaultCoords"] === ID && # =!= ID &], ", "]}]]];
     If[TensorData[ID]["Role"] === "Metric", AppendTo[info, Row[{Style["Tensors Using This Metric: ", Bold], Row[Select[Keys[TensorData], TensorData[#]["Metric"] === ID && # =!= ID &], ", "]}]]];
     OGRePrint[Column[info]];
 ];
 
 
-CreateUsageMessage[TInitializeSymbols, {symbol1, symbol2, "..."}, "clears any definitions previously used for the given symbols and protects them against future changes.
-Useful for making sure coordinate variables, constants, and abstract functions used in tensors do not accidentally change their definitions and break the code."];
+CreateUsageMessage[TInitializeSymbols, "TInitializeSymbols[`symbol1`, `symbol2`, `...`] clears any definitions previously used for the given symbols and protects them against future changes. Useful for making sure coordinate variables, parameters, and abstract functions used in tensors do not accidentally change their definitions and break the code."];
 TInitializeSymbols[symbols__] := (
     Unprotect[symbols];
     ClearAll[symbols];
@@ -821,18 +832,22 @@ TInitializeSymbols[symbols__] := (
 Attributes[TInitializeSymbols] = HoldAll;
 
 
-CreateUsageMessage[TList, {ID, indices, coordinatesID, function}, "lists the unique, non-zero components of the tensor object `1` with the index configuration `2` and in the coordinate system `3`.
-`2` should be a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index.
-If the index configuration and/or coordinate system are omitted, the default ones will be used.
-`4` is an optional function to map to each of the tensor's elements before they are displayed. Typically this would be ReplaceAll[rules] to apply the rules to the elements, but any function can be used."];
+CreateUsageMessage[TList, "TList[`ID`] lists the unique, non-zero components of the tensor object `ID` in its default index configuration and coordinate system.
+TList[`ID`, `indices`] lists the components in the index configuration `indices`, which should be a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index.
+TList[`ID`, `coordinatesID`] lists the components in the coordinate system `coordinatesID`.
+TList[`ID`, `indices`, `coordinatesID`] lists the components in the index configuration `indices` and the coordinate system `coordinatesID`.
+TList[`ID`, `function`] maps `function` to each of the tensor's elements before they are displayed. Typically this would be ReplaceAll[rules] to apply the rules to the elements, but any function can be used.
+TList[`ID`, `indices`, `coordinatesID`, `function`] does all of the above; either `indices` or `coordinatesID` can be omitted."];
 TList[ID_String, indices_List : {"_UseDefault_"}, coordinatesID_String : "_UseDefault_", function_ : Identity] /; (!ListQ[function] && !StringQ[function]) := ShowList[ID, indices, coordinatesID, "List", function];
 
 
-CreateUsageMessage[TNewCoordinates, {coordinatesID, symbols}, "creates a new tensor object representing a coordinate system.
-`1` is a string that will be used to identify the new object, and must be unique. If a tensor object with the same ID already exists, it will be overwritten.
-`2` are the coordinate symbols, e.g. {t, x, y, z}. They will automatically be cleared and protected against future changes using TInitializeSymbols[ ]."];
+CreateUsageMessage[TNewCoordinates, "TNewCoordinates[`coordinatesID`, `symbols`], creates a new tensor object representing a coordinate system.
+`coordinatesID` is a string that will be used to identify the new object, and must be unique.
+`symbols` are the coordinate symbols, e.g. {t, x, y, z}. They will automatically be cleared and protected against future changes using TInitializeSymbols[]."];
 TNewCoordinates::ErrorEmptyList = "The coordinate symbols cannot be an empty list. At least one coordinate symbol must be specified.";
 TNewCoordinates[coordinatesID_String, coordinates_List?VectorQ] := (
+    (* Check that the target tensor object doesn't already exist. *)
+    CheckIfOverwriting[coordinatesID];
     (* Check that the coordinates are not an empty list. *)
     If[coordinates == {}, Message[TNewCoordinates::ErrorEmptyList]; Abort[]];
     (* Clear any definitions previously used for the coordinate symbols and protect them against future changes. *)
@@ -850,11 +865,11 @@ TNewCoordinates[coordinatesID_String, coordinates_List?VectorQ] := (
 Attributes[TNewCoordinates] = HoldRest;
 
 
-CreateUsageMessage[TNewMetric, {metricID, coordinatesID, components, symbol}, "creates a new tensor object representing a metric.
-`1` is a string that will be used to identify the new object, and must be unique. If a tensor object with the same ID already exists, it will be overwritten.
-`2` is the unique ID of a tensor object representing a coordinate system, created using TNewCoordinates[ ].
-`3` is a square matrix representing the metric with two lower indices in that coordinate system.
-`4` will be used to represent the metric in formulas. If not given, \"g\" will be used."];
+CreateUsageMessage[TNewMetric, "TNewMetric[`metricID`, `coordinatesID`, `components`, `symbol`} creates a new tensor object representing a metric.
+`metricID` is a string that will be used to identify the new object, and must be unique.
+`coordinatesID` is the unique ID of a tensor object representing a coordinate system, created using TNewCoordinates[].
+`components` is a square, symmetric, and invertible matrix representing the metric with two lower indices in that coordinate system.
+`symbol` will be used to represent the metric in formulas. If not given, \"g\" will be used."];
 TNewMetric::ErrorIncorrectDim = "The metric components must have the same dimension as the coordinates.";
 TNewMetric::ErrorNotInvertible = "The metric must be invertible.";
 TNewMetric::ErrorNotSymmetric = "The metric must be symmetric.";
@@ -865,6 +880,8 @@ TNewMetric[metricID_String, coordinatesID_String, components_List, symbol_String
         inverse,
         simplified
     },
+    (* Check that the target tensor object doesn't already exist. *)
+    CheckIfOverwriting[metricID];
     (* Check that the tensor object coordinatesID exists and represents a coordinate system. *)
     CheckIfTensorExists[coordinatesID];
     CheckIfCoordinates[coordinatesID];
@@ -876,7 +893,7 @@ TNewMetric[metricID_String, coordinatesID_String, components_List, symbol_String
     (* Then *)
         Message[TNewMetric::ErrorNotSquare];
         Abort[];
-    ]
+    ];
     (* Check that the metric components have the same dimension as the coordinates. *)
     If[
         dim != Length[TensorData[coordinatesID]["Components"][{{1}, coordinatesID}]],
@@ -918,19 +935,21 @@ TNewMetric[metricID_String, coordinatesID_String, components_List, symbol_String
 ];
 
 
-CreateUsageMessage[TNewTensor, {tensorID, metricID, coordinatesID, indices, components, symbol}, "creates a new tensor object.
-`1` is a string that will be used to identify the new object, and must be unique. If a tensor object with the same ID already exists, it will be overwritten.
-`2` is the unique ID of a tensor object representing a metric, created using TNewMetric[ ]. The metric will be used to raise and lower indices for the new tensor.
-`3` is the unique ID of a tensor object representing a coordinate system, created using TNewCoordinates[ ]. This coordinate system will be used to specify the components of the new tensor. If omitted, the default coordinate system of the metric `2` will be used instead.
-`4` is a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index.
-`5` is a list specifying the representation of the tensor with the index configuration `4` and in the coordinate system `3`.
-`6` will be used to represent the tensor in formulas. If not given, the placeholder " <> DefaultSymbol <> " will be used."];
+CreateUsageMessage[TNewTensor, "TNewTensor[`tensorID`, `metricID`, `coordinatesID`, `indices`, `components`, `symbol`, creates a new tensor object.
+`tensorID` is a string that will be used to identify the new object, and must be unique.
+`metricID` is the unique ID of a tensor object representing a metric, created using TNewMetric[]. The metric will be used to raise and lower indices for the new tensor.
+`coordinatesID` is the unique ID of a tensor object representing a coordinate system, created using TNewCoordinates[]. This coordinate system will be used to specify the components of the new tensor. If omitted, the default coordinate system of the metric `metricID` will be used.
+`indices` must be a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index.
+`components` is a list specifying the representation of the tensor with the index configuration `indices` and in the coordinate system `coordinatesID`.
+`symbol` will be used to represent the tensor in formulas. If not given, the placeholder " <> DefaultSymbol <> " will be used."];
 TNewTensor::ErrorDimension = "The components must have the same dimension as the coordinate system.";
 TNewTensor::ErrorRank = "The number of indices must match the rank of the components.";
 TNewTensor[tensorID_String, metricID_String, coordinatesID_String : "_UseDefault_", indices_List, components_List, symbol_String : DefaultSymbol] := Module[
     {
         useCoords
     },
+    (* Check that the target tensor object doesn't already exist. *)
+    CheckIfOverwriting[tensorID];
     (* Check that the tensor object metricID exists and represents a metric. *)
     CheckIfTensorExists[metricID];
     CheckIfMetric[metricID];
@@ -987,152 +1006,13 @@ TNewTensor[tensorID_String, metricID_String, coordinatesID_String : "_UseDefault
 ];
 
 
-CreateUsageMessage[TParallelize, {"True/False"}, "enables or disable the parallelization of tensor simplifications. The default value is `2`. If simplifications take less than a few seconds, then you should leave parallelization off, as it has a small overhead and may actually impede performance. However, if simplifications are taking more than a few seconds, then it is highly recommended to enable parallelization for a significant performance boost.", {"False"}];
-TParallelize[par_] := (
-    Unprotect[TensorData];
-    TensorData[Options]["Parallelize"] = par;
-    Protect[TensorData];
-    If[
-        par,
-    (* Then *)
-        OGRePrint["Parallelization enabled."];
-        (* Launch the kernels for parallelization if they have not been launched yet, or if fewer than the maximum available number of kernels have been launched. Better do it now than cause a delay later. *)
-        If[
-            $KernelCount < $ConfiguredKernels[[1, 1]],
-        (* Then *)
-            LaunchKernels[$ConfiguredKernels[[1, 1]] - $KernelCount];
-            OGRePrint[$KernelCount, " parallel kernels launched. CPU has ", $ProcessorCount, " cores."];
-        ],
-    (* Else *)
-        OGRePrint["Parallelization disabled."];
-    ];
-);
-
-
-CreateUsageMessage[TRicciScalar, {metricID}, "calculates the Ricci scalar from the metric `1` and stores the result in a new tensor object with ID \"`1`RicciScalar\".
-If a tensor with ID \"`1`RicciTensor\" exists, it will be assumed to be the Ricci tensor of the metric, and will be used in the calculation. Otherwise, \"`1`RicciTensor\" will be created using TRicciTensor[ ]."];
-TRicciScalar::ErrorNotMetric = "The Ricci scalar can only be calculated from a tensor object representing a metric.";
-TRicciScalar[metricID_String] := Module[
-    {
-        RicciScalarID
-    },
-    (* Check that metricID is indeed a metric. *)
-    If[
-        TensorData[metricID]["Role"] =!= "Metric",
-    (* Then *)
-        Message[TRicciScalar::ErrorNotMetric];
-        Abort[];
-    ];
-    (* If the Ricci tensor was not already calculated, calculate it now. *)
-    If[
-        !KeyExistsQ[TensorData, metricID <> "RicciTensor"],
-    (* Then *)
-        TRicciTensor[metricID];
-    ];
-    (* Calculate the Ricci scalar, and give the tensor object the correct ID and symbol. *)
-    RicciScalarID = TCalc[
-        (metricID <> "RicciScalar")[""],
-        (metricID <> "RicciTensor")["\[Mu]\[Mu]"],
-        "R"
-    ];
-    (* Set the role of the tensor to Ricci Scalar for future reference. *)
-    ChangeTensorKey[RicciScalarID, "Role", "Ricci Scalar"];
-    Return[RicciScalarID];
-];
-
-
-CreateUsageMessage[TRicciTensor, {metricID}, "calculates the Ricci tensor from the metric `1` and stores the result in a new tensor object with ID \"`1`RicciTensor\".
-If a tensor with ID \"`1`Riemann\" exists, it will be assumed to be the Riemann tensor of the metric, and will be used in the calculation. Otherwise, \"`1`Riemann\" will be created using TRiemannTensor[ ]."];
-TRicciTensor::ErrorNotMetric = "The Ricci tensor can only be calculated from a tensor object representing a metric.";
-TRicciTensor[metricID_String] := Module[
-    {
-        RicciTensorID
-    },
-    (* Check that metricID is indeed a metric. *)
-    If[
-        TensorData[metricID]["Role"] =!= "Metric",
-    (* Then *)
-        Message[TRicciTensor::ErrorNotMetric];
-        Abort[];
-    ];
-    (* If the Riemann tensor was not already calculated, calculate it now. *)
-    If[
-        !KeyExistsQ[TensorData, metricID <> "Riemann"],
-    (* Then *)
-        TRiemannTensor[metricID];
-    ];
-    (* Calculate the Ricci tensor, and give the tensor object the correct ID and symbol. *)
-    RicciTensorID = TCalc[
-        (metricID <> "RicciTensor")["\[Mu]\[Nu]"],
-        (metricID <> "Riemann")["\[Lambda]\[Mu]\[Lambda]\[Nu]"],
-        "R"
-    ];
-    (* Set the role of the tensor to Ricci Tensor for future reference. *)
-    ChangeTensorKey[RicciTensorID, "Role", "Ricci Tensor"];
-    Return[RicciTensorID];
-];
-
-
-CreateUsageMessage[TRiemannTensor, {metricID}, "calculates the Riemann tensor from the metric `1` and stores the result in a new tensor object with ID \"`1`Riemann\".
-If a tensor with ID \"`1`Christoffel\" exists, it will be assumed to be the Christoffel symbols of the metric, and will be used in the calculation. Otherwise, \"`1`Christoffel\" will be created using TChristoffel[ ]."];
-TRiemannTensor::ErrorNotMetric = "The Riemann tensor can only be calculated from a tensor object representing a metric.";
-TRiemannTensor[metricID_String] := Module[
-    {
-        RiemannID
-    },
-    (* Check that metricID is indeed a metric. *)
-    If[
-        TensorData[metricID]["Role"] =!= "Metric",
-    (* Then *)
-        Message[TRiemannTensor::ErrorNotMetric];
-        Abort[];
-    ];
-    (* If the Christoffel symbols were not already calculated, calculate them now. *)
-    If[
-        !KeyExistsQ[TensorData, metricID <> "Christoffel"],
-    (* Then *)
-        TChristoffel[metricID];
-    ];
-    (* Calculate the Riemann tensor, and give the tensor object the correct ID, symbol, and default index configuration. *)
-    RiemannID = TChangeDefaultIndices[
-        TCalc[
-            (metricID <> "Riemann")["\[Rho]\[Sigma]\[Mu]\[Nu]"],
-            TPartialD["\[Mu]"] . (metricID <> "Christoffel")["\[Rho]\[Nu]\[Sigma]"] -
-            TPartialD["\[Nu]"] . (metricID <> "Christoffel")["\[Rho]\[Mu]\[Sigma]"] +
-            (metricID <> "Christoffel")["\[Rho]\[Mu]\[Lambda]"] . (metricID <> "Christoffel")["\[Lambda]\[Nu]\[Sigma]"] -
-            (metricID <> "Christoffel")["\[Rho]\[Nu]\[Lambda]"] . (metricID <> "Christoffel")["\[Lambda]\[Mu]\[Sigma]"],
-            "R"
-        ],
-        {1,-1,-1,-1}
-    ];
-    (* Set the role of the tensor to Riemann for future reference. *)
-    ChangeTensorKey[RiemannID, "Role", "Riemann"];
-    Return[RiemannID];
-];
-
-
-CreateUsageMessage[TShow, {ID, indices, coordinatesID, function}, "shows the components of the tensor object `1` with the index configuration `2` and in the coordinate system `3`, in vector or matrix form when applicable.
-`2` should be a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index.
-If the index configuration and/or coordinate system are omitted, the default ones will be used.
-`4` is an optional function to map to each of the tensor's elements before they are displayed. Typically this would be ReplaceAll[rules] to apply the rules to the elements, but any function can be used."];
-TShow[ID_String, indices_List : {"_UseDefault_"}, coordinatesID_String : "_UseDefault_", function_ : Identity] /; (!ListQ[function] && !StringQ[function]) := ShowList[ID, indices, coordinatesID, "Show", function];
-
-
-CreateUsageMessage[TSimplify, {ID}, "simplifies all previously-calculated representations of the tensor object `1` based on the user-defined simplification assumptions set using TSimplifyAssumptions[ ]. To be used if the assumptions have changed after the components have already been calculated."];
-TSimplify[ID_String] := (
-    CheckIfTensorExists[ID];
-    ChangeTensorKey[ID, "Components", TensorSimplify /@ TensorData[ID]["Components"]];
-    Return[ID];
-);
-
-
-CreateUsageMessage[TSimplifyAssumptions, {assumptions}, "adds assumptions to be used when simplifying expressions. The new assumptions will be appended to any previously added assumptions.
-If `1` is omitted, displays the currently used assumptions instead.
-Use TSimplifyAssumptions[None] to clear all previously added assumptions.
-By default, OGRe automatically assumes all variable are real, by adding the assumption Element[_, Reals] when simplifying expressions. To disable this assumption, use TSimplifyAssumptions[!Reals]. To re-enable it later, use TSimplifyAssumptions[Reals].
+CreateUsageMessage[TSetAssumptions, "TSetAssumptions[] shows the assumptions to be used when simplifying expressions.
+TSetAssumptions[`assumptions`] appends new assumptions to the previously added assumptions.
+TSetAssumptions[None] clears all previously added assumptions.
+TSetAssumptions[!Reals] disables the default assumption that all variable are real, which secretly adds the assumption Element[_, Reals] to the list of assumptions. TSetAssumptions[Reals] re-enables this assumption.
 The output of this module is always an Association indicating whether variables are assumed to be real and listing the user-defined assumptions."];
-TSimplifyAssumptions[] := TensorData[Options]["SimplifyAssumptions"];
-TSimplifyAssumptions[assumptions_] := (
+TSetAssumptions[] := TensorData[Options]["SimplifyAssumptions"];
+TSetAssumptions[assumptions_] := (
     Unprotect[TensorData];
     Switch[
         assumptions,
@@ -1154,7 +1034,59 @@ TSimplifyAssumptions[assumptions_] := (
     Protect[TensorData];
     Return[TensorData[Options]["SimplifyAssumptions"]];
 );
-Attributes[TSimplifyAssumptions] = HoldAll;
+Attributes[TSetAssumptions] = HoldAll;
+
+
+DefaultIndexLetters = "\[Mu]\[Nu]\[Rho]\[Sigma]\[Kappa]\[Lambda]\[Alpha]\[Beta]\[Gamma]\[Delta]\[CurlyEpsilon]\[Zeta]\[Epsilon]\[Theta]\[Iota]\[Xi]\[Pi]\[Tau]\[Phi]\[Chi]\[Psi]\[Omega]";
+CreateUsageMessage[TSetIndexLetters, "TSetIndexLetters[] shows the index letters used when displaying indices.
+TSetIndexLetters[`letters`] changes the index letters.
+TSetIndexLetters[Automatic] resets the index letters to the default: \"" <> DefaultIndexLetters <> "\"."];
+TSetIndexLetters[] := TensorData[Options]["IndexLetters"];
+TSetIndexLetters[letters_String] := (
+    Unprotect[TensorData];
+    TensorData[Options]["IndexLetters"] = letters;
+    Protect[TensorData];
+);
+TSetIndexLetters[Automatic] := TSetIndexLetters[DefaultIndexLetters];
+
+
+CreateUsageMessage[TSetParallelization, "TSetParallelization[`True`] enables the parallelization of tensor simplifications, and TSetParallelization[`False`] disables it. The default value is `False`. If simplifications take less than a few seconds, then you should leave parallelization off, as it has a small overhead and may actually impede performance. However, if simplifications are taking more than a few seconds, then it is highly recommended to enable parallelization for a significant performance boost."];
+TSetParallelization[par_] := (
+    Unprotect[TensorData];
+    TensorData[Options]["Parallelize"] = par;
+    Protect[TensorData];
+    If[
+        par,
+    (* Then *)
+        OGRePrint["Parallelization enabled."];
+        (* Launch the kernels for parallelization if they have not been launched yet, or if fewer than the maximum available number of kernels have been launched. Better do it now than cause a delay later. *)
+        If[
+            $KernelCount < $ConfiguredKernels[[1, 1]],
+        (* Then *)
+            LaunchKernels[$ConfiguredKernels[[1, 1]] - $KernelCount];
+            OGRePrint[$KernelCount, " parallel kernels launched. CPU has ", $ProcessorCount, " cores."];
+        ],
+    (* Else *)
+        OGRePrint["Parallelization disabled."];
+    ];
+);
+
+
+CreateUsageMessage[TShow, "TShow[`ID`] shows the components of the tensor object `ID` in its default index configuration and coordinate system.
+TShow[`ID`, `indices`] shows the components in the index configuration `indices`, which should be a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index.
+TShow[`ID`, `coordinatesID`] shows the components in the coordinate system `coordinatesID`.
+TShow[`ID`, `indices`, `coordinatesID`] shows the components in the index configuration `indices` and the coordinate system `coordinatesID`.
+TShow[`ID`, `function`] maps `function` to each of the tensor's elements before they are displayed. Typically this would be ReplaceAll[rules] to apply the rules to the elements, but any function can be used.
+TShow[`ID`, `indices`, `coordinatesID`, `function`] does all of the above; either `indices` or `coordinatesID` can be omitted."];
+TShow[ID_String, indices_List : {"_UseDefault_"}, coordinatesID_String : "_UseDefault_", function_ : Identity] /; (!ListQ[function] && !StringQ[function]) := ShowList[ID, indices, coordinatesID, "Show", function];
+
+
+CreateUsageMessage[TSimplify, "TSimplify[`ID`] simplifies all previously-calculated representations of the tensor object `ID` based on the user-defined simplification assumptions set using TSetAssumptions[]. To be used if the assumptions have changed after the components have already been calculated."];
+TSimplify[ID_String] := (
+    CheckIfTensorExists[ID];
+    ChangeTensorKey[ID, "Components", TensorSimplify /@ TensorData[ID]["Components"]];
+    Return[ID];
+);
 
 
 (* =================================================== *)
@@ -1399,7 +1331,17 @@ CheckIfMetric[ID_String] := If[
 ];
 
 
-(* Check if a tensor with the given ID exists. *)
+(* Check if a tensor with the given ID exists, and abort if it does. *)
+CheckIfOverwriting::ErrorExists = "A tensor with the ID \"`1`\" already exists. Please rename it using TChangeID[] or delete it using TDelete[] first.";
+CheckIfOverwriting[ID_String] := If[
+    KeyExistsQ[TensorData, ID],
+(* Then *)
+    Message[CheckIfOverwriting::ErrorExists, ID];
+    Abort[];
+];
+
+
+(* Check if a tensor with the given ID exists, and abort if it doesn't. *)
 CheckIfTensorExists::ErrorDoesNotExist = "The tensor \"`1`\" does not exist.";
 CheckIfTensorExists[ID_String] := If[
     !KeyExistsQ[TensorData, ID],
@@ -1600,8 +1542,7 @@ ContractTensors[firstID_String[firstIndices_String], secondID_String[secondIndic
 
 
 (* Take the covariant derivative of a tensor. *)
-CreateUsageMessage[TCovariantD, {index}, "represents the covariant derivative when used in a tensor expression given to TCalc[ ].
-If a tensor with ID \"`2`Christoffel\" exists, where `2` is the metric associated with the tensor the derivative is acting upon, then it will be assumed to be the Levi-Civita connection of the metric, and will be used in the calculation. Otherwise, \"`2`Christoffel\" will be created using TChristoffel[ ].", {metricID}];
+CreateUsageMessage[TCovariantD, "TCovariantD[`index`] represents the covariant derivative when used in a tensor expression given to TCalc[]. If a tensor with ID \"`metricID`Christoffel\" exists, where `metricID` is the metric associated with the tensor the derivative is acting upon, then it will be assumed to be the Levi-Civita connection of the metric, and will be used in the calculation. Otherwise, \"`metricID`Christoffel\" will be created using TCalcChristoffel[]."];
 CovariantDivOrGrad[derivativeIndex_String, tensorID_String[tensorIndices_String]] := Module[
     {
         myChristoffel,
@@ -1616,7 +1557,7 @@ CovariantDivOrGrad[derivativeIndex_String, tensorID_String[tensorIndices_String]
     If[
         !KeyExistsQ[TensorData, myChristoffel],
     (* Then *)
-        TChristoffel[TensorData[tensorID]["Metric"]];
+        TCalcChristoffel[TensorData[tensorID]["Metric"]];
     ];
     (* The simplest way to calculate the covariant derivative is to do it for the representation of the tensor with all of its indices raised. Otherwise we have to worry about minus signs and different index order in the Christoffel symbols attached to the tensor's lower indices. So we create a new temporary tensor with all upper indices as its default index configuration. This guarantees that no raising or lowering of indices will take place when contracting the tensor with the partial derivative and the Christoffel symbols. *)
     useIndices = 1 & /@ TensorData[tensorID]["DefaultIndices"];
@@ -1648,8 +1589,21 @@ CovariantDivOrGrad[derivativeIndex_String, tensorID_String[tensorIndices_String]
 ];
 
 
+(* Create a clickable button that looks and behaves like a hyperlink. *)
+CreateButton[label_, action_] := Button[
+    MouseAppearance[Mouseover[
+        Style[label, "Hyperlink"],
+        Style[label, "HyperlinkActive"]
+    ], "LinkHand"],
+    action,
+    Appearance -> "Frameless",
+    BaseStyle -> "Hyperlink"
+];
+Attributes[CreateButton] = HoldRest;
+
+
 (* Take the divergence or gradient of a tensor. *)
-CreateUsageMessage[TPartialD, {index}, "represents the partial derivative when used in a tensor expression given to TCalc[ ]."];
+CreateUsageMessage[TPartialD, "TPartialD[`index`] represents the partial derivative when used in a tensor expression given to TCalc[]."];
 DivOrGrad::OneIndex = "The index specification of the partial derivative must be a string with exactly one character. If the character matches a character in the index specification of the tensor, it will be contracted with it to produce a divergence. Otherwise, the gradient will be calculated.";
 DivOrGrad[derivativeIndex_String, tensorID_String[tensorIndices_String]] := Module[
     {
@@ -1772,7 +1726,7 @@ ImportTensorData[data_Association] := (
         !KeyExistsQ[data, Options] || !KeyExistsQ[data[Options], "OGReVersion"] || data[Options]["OGReVersion"] != OGReVersion,
     (* Then *)
         OGRePrint["Warning: The imported tensors were created in a different version of OGRe. Compatibility issues may occur."];
-    ]
+    ];
     Unprotect[TensorData];
     TensorData = data;
     PopulateOptions[];
@@ -1803,6 +1757,59 @@ NewTempID[] := (
 
 (* Display an expression using the DisplayFormula style. The user must define what this style means manually in the notebook style sheet. *)
 Nice[expression_] := Style[expression, "DisplayFormula"];
+
+
+(* Print an expression in an uneditable cell with the label OGRe. *)
+OGRePrint[expression_] := CellPrint[ExpressionCell[expression, "Output", Editable -> False, CellLabel -> "OGRe:", CellLabelStyle -> Directive["CellLabel", Smaller, Blue]]];
+OGRePrint[expressions__] := OGRePrint[Row[{expressions}]];
+
+
+(* A special key in TensorData, Options, is used to store information about the current session, for the purpose of exporting and importing between sessions using TExportAll and TImportAll. Since this key is not a string, it cannot be accidentally overwritten by a tensor definition. *)
+PopulateOptions[] := Module[
+    {
+        useIndexLetters,
+        useParallelize,
+        useSimplifyAssumptions
+    },
+    If[
+        !KeyExistsQ[TensorData, Options],
+    (* Then *)
+        (* If the Options key doesn't exist, which can happen when the package first loads or when importing from an old version of OGRe, create it with the default values. *)
+        TensorData[Options] = Association[
+            "OGReVersion" -> OGReVersion,
+            "IndexLetters" -> DefaultIndexLetters,
+            "Parallelize" -> False,
+            "SimplifyAssumptions" -> Association[
+                "AssumeReal" -> True,
+                "User" -> None
+            ]
+        ],
+    (* Else *)
+        (* If the Options key does exist, populate it with the imported values, but substitute the default values if any keys are missing, which can happen when importing from a different version of OGRe. *)
+        useIndexLetters = Lookup[TensorData[Options], "IndexLetters", DefaultIndexLetters];
+        useParallelize = Lookup[TensorData[Options], "Parallelize", False];
+        If[
+            KeyExistsQ[TensorData[Options], "SimplifyAssumptions"],
+        (* Then *)
+            useSimplifyAssumptions = Association[
+                "AssumeReal" -> Lookup[TensorData[Options]["SimplifyAssumptions"], "AssumeReal", True],
+                "User" -> Lookup[TensorData[Options]["SimplifyAssumptions"], "User", None]
+            ],
+        (* Else *)
+            useSimplifyAssumptions = Association[
+                "AssumeReal" -> True,
+                "User" -> None
+            ]
+        ];
+        TensorData[Options] = Association[
+            "OGReVersion" -> OGReVersion,
+            "IndexLetters" -> useIndexLetters,
+            "Parallelize" -> useParallelize,
+            "SimplifyAssumptions" -> useSimplifyAssumptions
+        ];
+    ];
+];
+PopulateOptions[];
 
 
 (* Change one of a tensor's indices to the desired position (upper = +1 or lower = -1), starting from a specific index configuration (assumed to be already calculated). The new components are then saved as a separate representation within the tensor object. Returns the new index configuration. *)
@@ -2022,6 +2029,37 @@ ShowList[ID_String, indices_List, coordinatesID_String, showOrList_String, funct
             Alignment -> {Center, Baseline}
         ]]];
     ];
+];
+
+
+StartupCheckForUpdates[] := Module[
+    {
+        newVersion,
+        remoteFile,
+        versionLookup
+    },
+    remoteFile = Quiet[Import[OGReURL, "Text"]];
+    Unprotect[UpdateMessage];
+    If[
+        remoteFile === $Failed,
+    (* Then *)
+        UpdateMessage = Row[{"Could not check for updates automatically. Please visit ", Hyperlink["https://github.com/bshoshany/OGRe"], " to check manually."}],
+    (* Else *)
+        versionLookup = StringCases[remoteFile, Shortest["OGReVersion = \"" ~~ __ ~~ "\";"]];
+        If[
+            Length[versionLookup] == 1,
+        (* Then *)
+            newVersion = StringTake[versionLookup[[1]], {16, StringLength[versionLookup[[1]]] - 2}];
+            If[
+                newVersion === OGReVersion,
+            (* Then *)
+                UpdateMessage = "You have the latest version of the package.",
+            (* Else *)
+                UpdateMessage = Row[{"A new version of the package is available: ", Style[newVersion, Bold], ". For more information, type ", Style["TCheckForUpdates[]", "Input"], " or ", CreateButton["click here.", TCheckForUpdates[]]}];
+            ];
+        ];
+    ];
+    Protect[UpdateMessage];
 ];
 
 
@@ -2316,6 +2354,26 @@ TransformCoordinates[ID_String, indices_List, sourceID_String, targetID_String] 
     ChangeTensorKey[ID, "Components", allComponents];
     Return[newComponents];
 ];
+
+
+UpdateMessage = "Checking for updates...";
+
+
+(* Print a welcome message at startup. *)
+OGRePrint[Column[{
+    Style[Row[{"OGRe: An ", Style["O", Underlined], "bject-Oriented ", Style["G", Underlined], "eneral ", Style["Re", Underlined], "lativity Package for Mathematica"}], Bold, Larger],
+    Style[Row[{"By Barak Shoshany (", Hyperlink["baraksh@gmail.com", "mailto:baraksh@gmail.com"], ") (", Hyperlink["baraksh.com", "https://baraksh.com/"], ")"}], Bold],
+    Style[Row[{OGReVersion}], Bold],
+    Style[Row[{"GitHub repository: ", Hyperlink["https://github.com/bshoshany/OGRe"]}], Bold],
+    Row[{"\[Bullet] To view the full documentation for the package, type ", Style["TDocs[]", "Input"], " or ", CreateButton["click here.", TDocs[]]}],
+    Row[{"\[Bullet] To list all available modules, type ", Style["?OGRe`*", "Input"], " or ", CreateButton["click here.", OGRePrint[Information["OGRe`*"]]]}],
+    Row[{"\[Bullet] To get help on a particular module, type ", Style["?", "Input"], " followed by the module name."}],
+    Row[{"\[Bullet] To enable parallelization, type ", Style["TSetParallelization[True]", "Input"], " or ", CreateButton["click here.", TSetParallelization[True]]}],
+    Row[{"\[Bullet] ", Dynamic[UpdateMessage]}]
+}]];
+
+
+SessionSubmit[StartupCheckForUpdates[]];
 
 
 End[]; (* OGRe`Private` *)

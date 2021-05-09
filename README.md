@@ -1,4 +1,12 @@
-# OGRe: An **O**bject-Oriented **G**eneral **Re**lativity Package for Mathematica
+[![DOI:10.5281/zenodo.4742935](https://zenodo.org/badge/DOI/10.5281/zenodo.4742935.svg)](https://doi.org/10.5281/zenodo.4742935)
+[![License: MIT](https://img.shields.io/github/license/bshoshany/thread-pool)](https://github.com/bshoshany/OGRe/blob/master/LICENSE.txt)
+![Language: Mathematica 12](https://img.shields.io/badge/Language-Mathematica%2012-yellow)
+![File size in bytes](https://img.shields.io/github/size/bshoshany/OGRe/OGRe.m)
+![GitHub last commit](https://img.shields.io/github/last-commit/bshoshany/OGRe)
+[![GitHub repo stars](https://img.shields.io/github/stars/bshoshany/OGRe?style=social)](https://github.com/bshoshany/OGRe)
+[![Twitter @BarakShoshany](https://img.shields.io/twitter/follow/BarakShoshany?style=social)](https://twitter.com/BarakShoshany)
+
+# OGRe: An Object-Oriented General Relativity Package for Mathematica
 
 <!-- TOC depthFrom:2 -->
 
@@ -7,8 +15,7 @@
 - [Installing and loading the package](#installing-and-loading-the-package)
 - [Documentation](#documentation)
 - [Version history](#version-history)
-- [Citing](#citing)
-- [Copyright and license](#copyright-and-license)
+- [Copyright and citing](#copyright-and-citing)
 
 <!-- /TOC -->
 
@@ -41,10 +48,12 @@ I initially created OGRe for use in my own research, so I made it as flexible an
 * Fully portable. Can be imported directly from the web into any Mathematica notebook, without downloading or installing anything.
 * Clear and detailed documentation, with many examples, in both [Mathematica notebook](OGRe_Documentation.nb) and [PDF](OGRe_Documentation.pdf) format. Detailed usage messages are also provided.
 * Open source. The code is extensively documented; please feel free to fork and modify it as you see fit.
-* Under active development. Please see the "future plans" section of the documentation for more information. Bug reports and feature requests are welcome, and should be made via GitHub issues.
+* Under continuous and active development. Bug reports and feature requests are welcome, and should be made via [GitHub issues](https://github.com/bshoshany/OGRe/issues).
 
 <a id="markdown-installing-and-loading-the-package" name="installing-and-loading-the-package"></a>
 ## Installing and loading the package
+
+This package is compatible with Mathematica 12.0 or newer, on any platform (Windows, Linux, and Mac). It should also run on Mathematica 11 or 10, but that has not been tested. The package will not work on versions prior to Mathematica 10, due to extensive use of `Association`, which was introduced in Mathematica 10.0.
 
 The package consists of only one file, `OGRe.m`. There are several different ways to load the package:
 
@@ -71,6 +80,24 @@ Once the package is loaded, the documentation can be easily accessed by executin
 <a id="markdown-version-history" name="version-history"></a>
 ## Version history
 
+* v1.4 (2021-05-09)
+    * Changes to existing modules:
+        * `TAddCoordTransformation` now has the clearer syntax `TAddCoordTransformation[sourceID -> targetID, rules]`. The old syntax (with `,` instead of `->`) can still be used.
+        * `TChangeID` now has the clearer syntax `TChangeID[oldID -> newID]`. The old syntax (with `,` instead of `->`) can still be used.
+        * `TChristoffel`, `TEinsteinTensor`, `TRicciScalar`, `TRicciTensor`, and `TRiemannTensor` have been renamed to `TCalcChristoffel`, `TCalcEinsteinTensor`, `TCalcRicciScalar`, `TCalcRicciTensor`, and `TCalcRiemannTensor` respectively, to group them all together and clarify that they all calculate specific tensors using `TCalc`.
+        * `TIndexLetters`, `TParallelize`, and `TSimplifyAssumptions` have been renamed to `TSetIndexLetters`, `TSetParallelization`, and `TSetAssumptions` respectively, to group them all together and clarify that they all change various settings.
+        * `TCalc`, `TCalcChristoffel`, `TCalcEinsteinTensor`, `TCalcRicciScalar`, `TCalcRicciTensor`, `TCalcRiemannTensor`, `TChangeID`, `TImport`, `TNewCoordinates`, `TNewMetric`, and `TNewTensor` no longer overwrite existing tensors, to prevent data loss. The user will be instructed to rename the existing tensor using `TChangeID` or delete it using `TDelete` first.
+    * Other changes:
+        * Usage messages:
+            * Many usage messages have been simplified, improved, or clarified.
+            * Fixed a bug where loading the package directly from GitHub led to usage messages not being displayed properly due to doubling of line breaks.
+            * The way that usage messages are defined internally has also been simplified.
+        * Automatic checks for update:
+            * The package now checks for new versions automatically at startup. No information (personal or otherwise) is sent or collected; the package simply checks the GitHub repository for updates. This check is done asynchronously, to prevent delaying the loading of the package.
+            * An upcoming release will introduce persistent storage of user settings, including a setting which will allow disabling the checks for update at startup. Until then, users interested in turning off these automatic checks can change the line `SessionSubmit[StartupCheckForUpdates[]];` in `OGRe.m` to `UpdateMessage = "Checking for updates is disabled.";`.
+        * Fixed several lines in the code where a semicolon was missing at the end of the line, causing the code to not run correctly since Mathematica interprets newlines as multiplication by default.
+        * This package now has a DOI for citation purposes. Information on how to cite it in publications has been added to the source code and to `README.md`.
+        * Added GitHub badges to `README.md`.
 * v1.3 (2021-05-06)
     * Changes to existing modules:
         * `TExport`, `TExportAll`, `TImport`, and `TImportAll`:
@@ -127,16 +154,23 @@ Once the package is loaded, the documentation can be easily accessed by executin
 * v1.0 (2021-02-10)
     * Initial release.
 
-<a id="markdown-citing" name="citing"></a>
-## Citing
+<a id="markdown-copyright-and-citing" name="copyright-and-citing"></a>
+## Copyright and citing
 
-If you use this package in your research, please cite it as follows:
+Copyright (c) 2021 [Barak Shoshany](http://baraksh.com). Licensed under the [MIT license](LICENSE.txt).
 
-* Barak Shoshany, OGRe: An Object-oriented General Relativity Package for Mathematica, [https://github.com/bshoshany/OGRe](https://github.com/bshoshany/OGRe) (2021).
+If you use this package in published research, please cite it as follows:
 
-(This citation will be replaced with a journal reference once a paper is published.)
+* Barak Shoshany, "OGRe: An Object-Oriented General Relativity Package for Mathematica", [doi:10.5281/zenodo.4742935](https://doi.org/10.5281/zenodo.4742935) (May 2021)
 
-<a id="markdown-copyright-and-license" name="copyright-and-license"></a>
-## Copyright and license
+You can use the following BibTeX entry:
 
-Copyright (c) 2021 [Barak Shoshany](http://baraksh.com) (baraksh@gmail.com). Licensed under the [MIT license](LICENSE.txt).
+```none
+@article{Shoshany2021_OGRe,
+    author = {Barak Shoshany},
+    doi    = {10.5281/zenodo.4742935},
+    month  = {May},
+    title  = {{OGRe: An Object-Oriented General Relativity Package for Mathematica}},
+    year   = {2021}
+}
+```
