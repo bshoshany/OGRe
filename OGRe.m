@@ -5,6 +5,7 @@
 (*            By Barak Shoshany (baraksh@gmail.com) (baraksh.com)            *)
 (*                     https://github.com/bshoshany/OGRe                     *)
 (*     Copyright (c) 2021 Barak Shoshany. Licensed under the MIT license.    *)
+
 (* If you use this package in published research, please cite it as follows: *)
 (*    Barak Shoshany, "OGRe: An Object-Oriented General Relativity Package   *)
 (*        for Mathematica", doi:10.5281/zenodo.4742935 (May 2021)            *)
@@ -58,12 +59,14 @@ Null[{
     TImportAll,
     TInfo,
     TInitializeSymbols,
+    TLineElement,
     TList,
     TNewCoordinates,
     TNewMetric,
     TNewTensor,
     TPartialD,
     TSetAssumptions,
+    TSetAutoUpdates,
     TSetIndexLetters,
     TSetParallelization,
     TShow,
@@ -75,11 +78,31 @@ Begin["`Private`"]; (* OGRe`Private` *)
 
 
 (* DO NOT change the format of the next line. It is used by TCheckForUpdates to detect the version of this file. Changing it will break the automatic update mechanism. Only change the version number and date. *)
-OGReVersion = "v1.4 (2021-05-09)";
+OGReVersion = "v1.5 (2021-06-07)";
 
 
 (* The raw URL of this file on GitHub. *)
 OGReURL = "https://raw.githubusercontent.com/bshoshany/OGRe/master/OGRe.m";
+
+
+(* If the global options LocalSymbol has been previously set, then it will have the Head Association. Otherwise it will have the Head LocalSymbol, and we create it now for later use. *)
+If[
+    Head[LocalSymbol["OGReGlobalOptions"]] =!= Association,
+(* Then *)
+    LocalSymbol["OGReGlobalOptions"] = Association[];
+];
+(* Load the global options from the persistent storage. *)
+OGReGlobalOptions = LocalSymbol["OGReGlobalOptions"];
+(* Set the "OGReVersion" key to the current version of the package. *)
+OGReGlobalOptions["OGReVersion"] = OGReVersion;
+(* If the option "AutoUpdates" has not been set, or is not a boolean value, we set it now to True. *)
+If[
+    !KeyExistsQ[OGReGlobalOptions, "AutoUpdates"] || !BooleanQ[OGReGlobalOptions["AutoUpdates"]],
+(* Then *)
+    OGReGlobalOptions["AutoUpdates"] = True;
+];
+(* Save the global options to the persistent storage. *)
+LocalSymbol["OGReGlobalOptions"] = OGReGlobalOptions;
 
 
 (* ===================================================
@@ -801,7 +824,8 @@ TImportAll[filename_String] := Module[
 ];
 
 
-CreateUsageMessage[TInfo, "TInfo[`ID`] displays information about the tensor object `ID`, including its symbol, role, associated metric, and default coordinates and indices, in human-readable form.
+CreateUsageMessage[TInfo, "TInfo[] lists all the tensors created so far in this session: coordinate systems, metrics, and the tensors associated with each metric.
+TInfo[`ID`] displays information about the tensor object `ID`, including its symbol, role, associated metric, and default coordinates and indices, in human-readable form.
 If `ID` represents a coordinate system, displays a list of all tensors using it as their default coordinate system.
 If `ID` represents a metric, displays a list of all tensors using it as their associated metric."];
 TInfo[ID_String] := Module[
@@ -810,17 +834,44 @@ TInfo[ID_String] := Module[
     },
     (* Check that the tensor object ID exists. *)
     CheckIfTensorExists[ID];
-    (* Display information about the object. *)
+    (* Collect information about the object. *)
     info = {Row[{Style["ID: ", Bold], ID}]};
     AppendTo[info, Row[{Style["Symbol: ", Bold], TensorData[ID]["Symbol"]}]];
     AppendTo[info, Row[{Style["Role: ", Bold], TensorData[ID]["Role"]}]];
-    If[TensorData[ID]["Role"] =!= "Coordinates" && TensorData[ID]["Role"] =!= "Metric", AppendTo[info, Row[{Style["Metric: ", Bold], TensorData[ID]["Metric"]}]]];
-    If[TensorData[ID]["Role"] =!= "Coordinates", AppendTo[info, Row[{Style["Default Coordinates: ", Bold], TensorData[ID]["DefaultCoords"]}]]];
+    If[TensorData[ID]["Role"] =!= "Coordinates" && TensorData[ID]["Role"] =!= "Metric", AppendTo[info, Row[{Style["Metric: ", Bold], InfoButton[TensorData[ID]["Metric"]]}]]];
+    If[TensorData[ID]["Role"] =!= "Coordinates", AppendTo[info, Row[{Style["Default Coordinates: ", Bold], InfoButton[TensorData[ID]["DefaultCoords"]]}]]];
     AppendTo[info, Row[{Style["Default Indices: ", Bold], TensorData[ID]["DefaultIndices"]}]];
-    If[TensorData[ID]["Role"] === "Coordinates", AppendTo[info, Row[{Style["Used as Default Coordinates For: ", Bold], Row[Select[Keys[TensorData], TensorData[#]["DefaultCoords"] === ID && # =!= ID &], ", "]}]]];
-    If[TensorData[ID]["Role"] === "Metric", AppendTo[info, Row[{Style["Tensors Using This Metric: ", Bold], Row[Select[Keys[TensorData], TensorData[#]["Metric"] === ID && # =!= ID &], ", "]}]]];
+    (* If ID represents a coordinate system, display a list of all tensors using it as their default coordinate system. *)
+    If[TensorData[ID]["Role"] === "Coordinates", AppendTo[info, Row[{Style["Default Coordinates For: ", Bold], Row[InfoButton /@ Select[Keys[TensorData], TensorData[#]["DefaultCoords"] === ID && # =!= ID &], ", "]}]]];
+    (* If ID represents a metric, display a list of all tensors using it as their associated metric. *)
+    If[TensorData[ID]["Role"] === "Metric", AppendTo[info, Row[{Style["Tensors Using This Metric: ", Bold], Row[InfoButton /@ Select[Keys[TensorData], TensorData[#]["Metric"] === ID && # =!= ID &], ", "]}]]];
+    (* Provide links to print out the components of the tensor using TList or TShow. *)
+    AppendTo[info, Row[{
+        Style["Components: ", Bold],
+        CreateButton["TList", TList[ID]],
+        " | ",
+        CreateButton["TShow", TShow[ID]]
+    }]];
+    (* Print out the collected information. *)
     OGRePrint[Column[info]];
 ];
+TInfo[] := Module[
+    {
+        tensorList, countCoord = 1, countMetric = 1
+    },
+    (* List all tensors except for Options (which is not actually a tensor) and DefaultResultID. *)
+    tensorList = Sort[DeleteCases[Keys[TensorData], Options | DefaultResultID]];
+    (* Print a list of the coordinate systems, metrics, and the tensors associated with each metric. *)
+    OGRePrint[Column[{
+        Row[{Style["Total tensors created: ", Bold], Length[tensorList]}],
+        Style["Coordinate Systems:", Bold],
+        Column[Table[Row[{countCoord++, ". ", ID}], {ID, InfoButton /@ Select[tensorList, TensorData[#]["Role"] == "Coordinates" &]}]],
+        Style["Metrics:", Bold],
+        Column[Table[Row[{countMetric++, ". ", Style[InfoButton[ID], Bold], " \[RightArrow] ", Row[InfoButton /@ Select[Keys[TensorData], TensorData[#]["Metric"] === ID && # =!= ID && # =!= DefaultResultID &], "|"]}], {ID, Select[tensorList, TensorData[#]["Role"] == "Metric" &]}]]
+    }]];
+];
+(* Create a link that will execute TInfo for a specific tensor when clicked. *)
+InfoButton[ID_String] := CreateButton[ID, TInfo[ID]];
 
 
 CreateUsageMessage[TInitializeSymbols, "TInitializeSymbols[`symbol1`, `symbol2`, `...`] clears any definitions previously used for the given symbols and protects them against future changes. Useful for making sure coordinate variables, parameters, and abstract functions used in tensors do not accidentally change their definitions and break the code."];
@@ -830,6 +881,45 @@ TInitializeSymbols[symbols__] := (
     Protect[symbols];
 );
 Attributes[TInitializeSymbols] = HoldAll;
+
+
+CreateUsageMessage[TLineElement, "TLineElement[`ID`] displays the line element of the metric `ID` in its default coordinate system.
+TLineElement[`ID`, `coordinatesID`] displays the line element in the coordinate system `coordinatesID`."];
+TLineElement::ErrorNotMetric = "Only a metric can be displayed as a line element.";
+TLineElement[ID_String, coordinatesID_String : "_UseDefault_"] := Module[
+    {
+        components,
+        coordSymbols,
+        dim,
+        useCoords
+    },
+    (* Check that ID is indeed a metric. *)
+    If[
+        TensorData[ID]["Role"] =!= "Metric",
+    (* Then *)
+        Message[TLineElement::ErrorNotMetric];
+        Abort[];
+    ];
+    (* If a specific coordinate system is not given, use the metric's default coordinate system. *)
+    If[
+        coordinatesID === "_UseDefault_",
+    (* Then *)
+        useCoords = TensorData[ID]["DefaultCoords"],
+    (* Else *)
+        (* Check that the tensor object coordinatesID exists and represents a coordinate system. *)
+        CheckIfTensorExists[coordinatesID];
+        CheckIfCoordinates[coordinatesID];
+        useCoords = coordinatesID;
+    ];
+    (* Get the coordinate symbols to be used in the line element. *)
+    coordSymbols = TensorData[useCoords]["Components"][{{1}, useCoords}];
+    (* The dimension is the number of coordinates. *)
+    dim = Length[coordSymbols];
+    (* Get the metric's components in the desired representation, adding it if it does not already exist. *)
+    components = AddRepresentation[ID, {-1, -1}, useCoords];
+    (* Return the line element. *)
+    Return[Sum[components[[m, n]] * Symbol["\[DoubleStruckD]"<>ToString[coordSymbols[[m]]]] * Symbol["\[DoubleStruckD]"<>ToString[coordSymbols[[n]]]], {m, 1, dim}, {n, 1, dim}]];
+];
 
 
 CreateUsageMessage[TList, "TList[`ID`] lists the unique, non-zero components of the tensor object `ID` in its default index configuration and coordinate system.
@@ -1037,6 +1127,17 @@ TSetAssumptions[assumptions_] := (
 Attributes[TSetAssumptions] = HoldAll;
 
 
+CreateUsageMessage[TSetAutoUpdates, "TSetAutoUpdates[`False`] turns off automatic checks for updates at startup. TSetAutoUpdates[`True`] turns them back on, which is the default setting. TSetAutoUpdates[] returns the current setting. Note that this setting is persistent between sessions."];
+TSetAutoUpdates[bool_?BooleanQ] := (
+    Unprotect[OGReGlobalOptions];
+    OGReGlobalOptions["AutoUpdates"] = bool;
+    OGRePrint["Auto updates turned ", If[bool, "on", "off"], "."];
+    LocalSymbol["OGReGlobalOptions"] = OGReGlobalOptions;
+    Protect[OGReGlobalOptions];
+);
+TSetAutoUpdates[] := OGReGlobalOptions["AutoUpdates"];
+
+
 DefaultIndexLetters = "\[Mu]\[Nu]\[Rho]\[Sigma]\[Kappa]\[Lambda]\[Alpha]\[Beta]\[Gamma]\[Delta]\[CurlyEpsilon]\[Zeta]\[Epsilon]\[Theta]\[Iota]\[Xi]\[Pi]\[Tau]\[Phi]\[Chi]\[Psi]\[Omega]";
 CreateUsageMessage[TSetIndexLetters, "TSetIndexLetters[] shows the index letters used when displaying indices.
 TSetIndexLetters[`letters`] changes the index letters.
@@ -1050,8 +1151,8 @@ TSetIndexLetters[letters_String] := (
 TSetIndexLetters[Automatic] := TSetIndexLetters[DefaultIndexLetters];
 
 
-CreateUsageMessage[TSetParallelization, "TSetParallelization[`True`] enables the parallelization of tensor simplifications, and TSetParallelization[`False`] disables it. The default value is `False`. If simplifications take less than a few seconds, then you should leave parallelization off, as it has a small overhead and may actually impede performance. However, if simplifications are taking more than a few seconds, then it is highly recommended to enable parallelization for a significant performance boost."];
-TSetParallelization[par_] := (
+CreateUsageMessage[TSetParallelization, "TSetParallelization[`True`] enables the parallelization of tensor simplifications, and TSetParallelization[`False`] disables it. The default value is `False`. TSetParallelization[] returns the current value. If simplifications take less than a few seconds, then you should leave parallelization off, as it has a small overhead and may actually impede performance. However, if simplifications are taking more than a few seconds, then it is highly recommended to enable parallelization for a significant performance boost."];
+TSetParallelization[par_?BooleanQ] := (
     Unprotect[TensorData];
     TensorData[Options]["Parallelize"] = par;
     Protect[TensorData];
@@ -1070,6 +1171,7 @@ TSetParallelization[par_] := (
         OGRePrint["Parallelization disabled."];
     ];
 );
+TSetParallelization[] := TensorData[Options]["Parallelize"];
 
 
 CreateUsageMessage[TShow, "TShow[`ID`] shows the components of the tensor object `ID` in its default index configuration and coordinate system.
@@ -2055,7 +2157,7 @@ StartupCheckForUpdates[] := Module[
             (* Then *)
                 UpdateMessage = "You have the latest version of the package.",
             (* Else *)
-                UpdateMessage = Row[{"A new version of the package is available: ", Style[newVersion, Bold], ". For more information, type ", Style["TCheckForUpdates[]", "Input"], " or ", CreateButton["click here.", TCheckForUpdates[]]}];
+                UpdateMessage = Row[{"A new version of the package is available: ", Style[newVersion, Bold], ". For more information, type ", CreateButton["TCheckForUpdates[]", TCheckForUpdates[]], "."}];
             ];
         ];
     ];
@@ -2094,7 +2196,7 @@ TensorByScalar[ID_String[indices_String], scalar_, useSymbol_: False] := Module[
             NumberQ[scalar] && scalar == -1, "-",
             NumberQ[scalar], scalar,
             useSymbol =!= False, useSymbol,
-            True, Splice[{"(", scalar, ")"}]
+            True, Row[{"(", scalar, ")"}]
         ],
         If[
             TensorData[ID]["Role"] === "Temporary",
@@ -2356,8 +2458,16 @@ TransformCoordinates[ID_String, indices_List, sourceID_String, targetID_String] 
 ];
 
 
-UpdateMessage = "Checking for updates...";
-
+(* Check for updates at startup, if the AutoUpdates setting is turned on. *)
+If[
+    OGReGlobalOptions["AutoUpdates"],
+(* Then *)
+    UpdateMessage = "Checking for updates...";
+    UpdateCheck = Row[{Dynamic[UpdateMessage], " To disable automatic checks for updates at startup, type ", CreateButton["TSetAutoUpdates[False]", TSetAutoUpdates[False]], "."}];
+    SessionSubmit[StartupCheckForUpdates[]],
+(* Else *)
+    UpdateCheck = Row[{"To check for updates, type ", CreateButton["TCheckForUpdates[]", TCheckForUpdates[]], ". ", "To enable automatic checks for updates at startup, type ", CreateButton["TSetAutoUpdates[True]", TSetAutoUpdates[True]], "."}];
+]
 
 (* Print a welcome message at startup. *)
 OGRePrint[Column[{
@@ -2365,15 +2475,12 @@ OGRePrint[Column[{
     Style[Row[{"By Barak Shoshany (", Hyperlink["baraksh@gmail.com", "mailto:baraksh@gmail.com"], ") (", Hyperlink["baraksh.com", "https://baraksh.com/"], ")"}], Bold],
     Style[Row[{OGReVersion}], Bold],
     Style[Row[{"GitHub repository: ", Hyperlink["https://github.com/bshoshany/OGRe"]}], Bold],
-    Row[{"\[Bullet] To view the full documentation for the package, type ", Style["TDocs[]", "Input"], " or ", CreateButton["click here.", TDocs[]]}],
-    Row[{"\[Bullet] To list all available modules, type ", Style["?OGRe`*", "Input"], " or ", CreateButton["click here.", OGRePrint[Information["OGRe`*"]]]}],
+    Row[{"\[Bullet] To view the full documentation for the package, type ", CreateButton["TDocs[]", TDocs[]], "."}],
+    Row[{"\[Bullet] To list all available modules, type ", CreateButton["?OGRe`*", OGRePrint[Information["OGRe`*"]]], "."}],
     Row[{"\[Bullet] To get help on a particular module, type ", Style["?", "Input"], " followed by the module name."}],
-    Row[{"\[Bullet] To enable parallelization, type ", Style["TSetParallelization[True]", "Input"], " or ", CreateButton["click here.", TSetParallelization[True]]}],
-    Row[{"\[Bullet] ", Dynamic[UpdateMessage]}]
+    Row[{"\[Bullet] To enable parallelization, type ", CreateButton["TSetParallelization[True]", TSetParallelization[True]], "."}],
+    Row[{"\[Bullet] ", UpdateCheck}]
 }]];
-
-
-SessionSubmit[StartupCheckForUpdates[]];
 
 
 End[]; (* OGRe`Private` *)
