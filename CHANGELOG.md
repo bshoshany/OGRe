@@ -2,6 +2,49 @@
 
 ## Version history
 
+* v1.6 (2021-08-07)
+    * New modules:
+        * `TCalcGeodesicFromChristoffel`:
+            * Creates a new rank-1 tensor object containing the geodesic equations obtained for each of the coordinates using the Christoffel symbols of the given metric: <i>&#7821;</i><sup>&sigma;</sup> + &Gamma;<sup>&sigma;</sup><sub>&mu;&nu;</sub><i>&#7819;</i><sup>&mu;</sup><i>&#7819;</i><sup>&nu;</sup> = 0.
+            * The Christoffel symbols will be calculated automatically using `TCalcChristoffel` if they have not already been calculated.
+        * `TCalcGeodesicFromLagrangian`:
+            * Creates a new rank-1 tensor object containing the geodesic equations obtained for each of the coordinates by applying the Euler-Lagrange equations to the curve Lagrangian.
+            * The Lagrangian will be calculated automatically using `TCalcLagrangian` (see below) if it has not already been calculated.
+            * This module leaves the derivatives with respect to the curve parameter in the Euler-Lagrange equation unevaluated (using `Inactive`), which can sometimes help solve the geodesic equations by inspection. Use `Activate` to evaluate the derivatives. (Recall that `TList` and `TShow` can apply a function to the tensor's components before displaying them, so you can write e.g. `TList["ID", Activate]`.)
+            * Often the equations obtained in this way will be different from the ones obtained using `TCalcGeodesicFromChristoffel`, but they will always have the same solutions. Usually, one of `TCalcGeodesicFromChristoffel` or `TCalcGeodesicFromLagrangian` will generate simpler equations for a given metric and/or coordinate system.
+        * `TCalcLagrangian`: Calculates the curve Lagrangian of a metric, defined as the norm-squared of the tangent to the curve: <i>g</i><sub>&mu;&nu;</sub><i>&#7819;</i><sup>&mu;</sup><i>&#7819;</i><sup>&nu;</sup>. Taking the square root of (the absolute value of) the Lagrangian yields the integrand of the curve length functional. Varying the Lagrangian using the Euler-Lagrange equations yields the geodesic equations (see `TCalcGeodesicFromLagrangian` above).
+        * `TMessage`:
+            * Not really a module, just a placeholder symbol to which messages not associated with any specific OGRe module are attached.
+            * In particular, when a private module (called only internally within the package) invokes `Message`, the message will now be displayed as `TMessage::<message_name>` instead of the awkward ``OGRe`Private`<module_name>::<message_name>``.
+            * Not all modules use `TMessage` yet; the transition will be performed gradually in the upcoming releases.
+        * `TSetAllowOverwrite`:
+            * Allows or disallows overwriting tensors. The default value is `False`, which means you cannot create a new tensor with the same ID as an existing tensor. Calling `TSetAllowOverwrite[True]` will allow overwriting tensors, which is more convenient, but can result in loss of data.
+            * You will be warned whenever a tensor is being overwritten, but this warning can be turned off (like any other `Message`) using `Off[TMessage::WarningOverwrite]`.
+            * This setting is persistent between sessions.
+        * `TSetCurveParameter`:
+            * Sets the curve parameter used by `TCalcGeodesicFromChristoffel`, `TCalcGeodesicFromLagrangian`, and `TCalcLagrangian`. These modules will produce results in terms of the coordinate symbols as functions of the curve parameter and their derivatives with respect to this parameter. The default value is &lambda;.
+            * If the Lagrangian or geodesic equation vector is displayed using `TList` or `TShow`, the arguments of the coordinate functions are omitted (e.g. <i>x</i> instead of <i>x</i>[&lambda;]) and derivatives with respect to the curve parameter are displayed in Newton (dot) notation (e.g. <i>&#7819;</i> instead of <i>x</i>'[&lambda;]) for improved readability. However, extracting the components using `TGetComponents` will produce the full expressions (e.g. to be used with `DSolve`).
+            * When the curve parameter is changed, the parameter of the coordinate functions in all of the tensors calculated so far will be changed accordingly.
+        * `TSetReservedSymbols`:
+            * Works similar to `TInitializeSymbols`, which has now been removed. However, `TSetReservedSymbols` also saves the reserved symbols so they can be exported and then imported in a later session.
+            * If the reserved symbol is a function of the coordinates, `TList` and `TShow` will not show the arguments of the function when displaying the components of a tensor, for improved readability.
+        * `TVolumeElementSquared`: Calculates the determinant of a given metric. The square root of the determinant (or its negative, for a pseudo-Riemannian metric) is the volume element.
+    * Changes to existing modules:
+        * All `TCalc*` modules now check if the metric exists first.
+        * `TGetComponents`: This module now gets the components of the tensor in the default index configuration and/or coordinate system if either or both are not specified. However, if the default value is used, a message will let you know which representation the components are given in, to avoid confusion.
+        * `TInitializeSymbols` has been removed and replaced with `TSetReservedSymbols` (see above).
+        * `TList` and `TShow`:
+            * Partial derivatives are now displayed in compact notation for improved readability.
+            * `TList` will no longer list the same element twice if it is non-zero but equal to minus itself (e.g. `ComplexInfinity`).
+            * See `TSetCurveParameter` and `TSetReservedSymbols` above for other changes.
+        * `TNewMetric`: If the new metric overrides a previous metric with the same ID, all of the curvature tensors calculated from the metric being overwritten will be automatically deleted, for consistency.
+        * `TSetParallelization`:
+            * Now uses `$MaxLicenseSubprocesses` instead of the deprecated (as of Mathematica 12.3) `$ConfiguredKernels` to determine how many kernels to launch when enabling parallelization.
+            * Disabling parallelization now also closes the kernels.
+            * Tensor simplifications will no longer invoke parallelization if the tensor only has one component, to avoid unnecessary overhead.
+    * Other changes:
+        * A button to open the GitHub repository directly in Visual Studio Code has been added to the badges in `README.md`.
+    * This release is dedicated to my grandfather Yona Shoshany, who taught me BASIC, my first programming language, in my early childhood. He passed away a day before this release was published.
 * v1.5 (2021-06-07)
     * New modules:
         * `TLineElement`: Displays the line element of a given metric in a coordinate system of your choice.

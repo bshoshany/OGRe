@@ -5,6 +5,7 @@
 ![GitHub last commit](https://img.shields.io/github/last-commit/bshoshany/OGRe)
 [![GitHub repo stars](https://img.shields.io/github/stars/bshoshany/OGRe?style=social)](https://github.com/bshoshany/OGRe)
 [![Twitter @BarakShoshany](https://img.shields.io/twitter/follow/BarakShoshany?style=social)](https://twitter.com/BarakShoshany)
+[![Open in Visual Studio Code](https://open.vscode.dev/badges/open-in-vscode.svg)](https://open.vscode.dev/bshoshany/OGRe)
 
 # OGRe: An Object-Oriented General Relativity Package for Mathematica
 
@@ -14,22 +15,18 @@ Department of Physics, Brock University,\
 [bshoshany@brocku.ca](mailto:bshoshany@brocku.ca) | [https://baraksh.com/](https://baraksh.com/)\
 DOI: [doi:10.5281/zenodo.4742935](https://doi.org/10.5281/zenodo.4742935)
 
-<!-- TOC depthFrom:2 -->
+* [Summary](#summary)
+* [Features](#features)
+* [Installing and loading the package](#installing-and-loading-the-package)
+* [Documentation](#documentation)
+* [Issue and pull request policy](#issue-and-pull-request-policy)
+* [Copyright and citing](#copyright-and-citing)
 
-- [Summary](#summary)
-- [Features](#features)
-- [Installing and loading the package](#installing-and-loading-the-package)
-- [Documentation](#documentation)
-- [Copyright and citing](#copyright-and-citing)
-
-<!-- /TOC -->
-
-<a id="markdown-summary" name="summary"></a>
 ## Summary
 
-OGRe is a modern Mathematica package for tensor calculus, designed to be both powerful and user-friendly. It can be used in a variety of contexts where tensor calculations are needed, in both mathematics and physics, but it is especially suitable for general relativity.
+OGRe is a modern Mathematica package for differential geometry and tensor calculus, designed to be both powerful and user-friendly. It can be used in a variety of contexts where tensor calculations are needed, in both mathematics and physics, but it is especially suitable for general relativity.
 
-Tensors are abstract objects, which can be represented as multi-dimensional arrays once a choice of index configuration and coordinate system is made. OGRe stays true to this definition, but takes away the complexities that come with combining tensors in different representations. This is done using an object-oriented programming approach, as detailed in the documentation.
+Tensors are abstract objects, which can be represented as multi-dimensional arrays once a choice of index configuration and coordinate system is made. OGRe stays true to this definition, but takes away the complexities that come with combining tensors in different representations. This is done using an object-oriented programming approach, taking advantage of principles such as encapsulation and class invariants to eliminate the possibility of user error.
 
 The user initially defines each tensor in OGRe using its explicit components in any single representation. Operations on this tensor are then done abstractly, without needing to specify which representation to use. Possible operations include addition of tensors, multiplication of tensor by scalar, trace, contraction, and partial and covariant derivatives.
 
@@ -39,23 +36,23 @@ Transformations between representations are done behind the scenes; all the user
 
 I initially created OGRe for use in my own research, so I made it as flexible and powerful as possible. I also wanted my students to be able to use it easily and efficiently, even if they only have minimal experience with Mathematica and/or general relativity, so I made it simple to learn and easy to use. As a result, this package is equally suitable for both experienced and novice researchers.
 
-<a id="markdown-features" name="features"></a>
 ## Features
 
 * Define coordinate systems and the transformation rules between them. Tensor components are then transformed automatically between coordinates behind the scenes as needed.
 * Each tensor is associated with a specific metric. Tensor components are then transformed automatically between different index configurations, raising and lowering indices behind the scenes as needed.
-* Display any tensor in any index configuration and coordinate system, either in vector/matrix form or as a list of all unique non-zero elements.
+* Display any tensor in any index configuration and coordinate system, either in vector/matrix form or as a list of all unique non-zero elements. Metrics can also be displayed as a line element.
 * Automatically simplify tensor components, optionally with user-defined simplification assumptions. Simplifications can be parallelized for a significant performance boost.
 * Export tensors to a Mathematica notebook or to a file, so they can later be imported into another Mathematica session without having to redefine them from scratch.
+* Highly customizable. User settings are exported and imported along with the tensors. Some settings are persistent between sessions.
 * Easily calculate arbitrary tensor formulas using any combination of addition, multiplication by scalar, trace, contraction, partial derivative, and covariant derivative.
-* Built-in modules for calculating the Christoffel symbols (Levi-Civita connection), Riemann tensor, Ricci tensor and scalar, and Einstein tensor. More will be added in future versions.
+* Built-in modules for calculating the Christoffel symbols (Levi-Civita connection), Riemann tensor, Ricci tensor and scalar, Einstein tensor, curve Lagrangian, and volume element from a metric.
+* Calculate the geodesic equation, in two different ways: from the Christoffel symbols or from the curve Lagrangian.
 * Built with speed and performance in mind, using optimized algorithms designed specifically for this package.
-* Fully portable. Can be imported directly from the web into any Mathematica notebook, without downloading or installing anything.
+* Fully portable. Can be imported directly from the web into any Mathematica notebook, without downloading or installing anything. Integrates seamlessly with the Wolfram Cloud.
 * Clear and detailed documentation, with many examples, in both [Mathematica notebook](OGRe_Documentation.nb) and [PDF](OGRe_Documentation.pdf) format. Detailed usage messages are also provided.
 * Open source. The code is extensively documented; please feel free to fork and modify it as you see fit.
 * Under continuous and active development. Bug reports and feature requests are welcome, and should be made via [GitHub issues](https://github.com/bshoshany/OGRe/issues).
 
-<a id="markdown-installing-and-loading-the-package" name="installing-and-loading-the-package"></a>
 ## Installing and loading the package
 
 This package is compatible with Mathematica 12.0 or newer. It consists of only one file, `OGRe.m`. There are several different ways to load the package:
@@ -70,7 +67,6 @@ This package is compatible with Mathematica 12.0 or newer. It consists of only o
 
 To uninstall the package, just delete the file from the `Applications` directory, which can be done from within Mathematica using the command `DeleteFile[FileNameJoin[{$UserBaseDirectory, "Applications", "OGRe.m"}]]`.
 
-<a id="markdown-documentation" name="documentation"></a>
 ## Documentation
 
 The full and detailed documentation for this package may be found in the following repository files:
@@ -80,9 +76,12 @@ The full and detailed documentation for this package may be found in the followi
 
 Once the package is loaded, the documentation can be easily accessed by executing the command `TDocs[]`, which automatically downloads the file `OGRe_Documentation.nb` from GitHub and opens it in Mathematica.
 
-For version history, please see the file `CHANGELOG.md`.
+## Issue and pull request policy
 
-<a id="markdown-copyright-and-citing" name="copyright-and-citing"></a>
+This package is under continuous and active development. If you encounter any bugs, or if you would like to request any additional features, please feel free to [open a new issue on GitHub](https://github.com/bshoshany/OGRe/issues) and I will look into it as soon as I can.
+
+Contributions are always welcome. However, I release my projects in cumulative updates after editing them locally on my system, so my policy is not to accept any pull requests. If you open a pull request, and I decide to incorporate it into the code, I will first perform some tests to ensure that the change doesn't break anything, and then merge it into the next release of the project, possibly together with some other changes, and along with a version bump and a corresponding note in `CHANGELOG.md` with a link to the pull request.
+
 ## Copyright and citing
 
 Copyright (c) 2021 [Barak Shoshany](http://baraksh.com). Licensed under the [MIT license](LICENSE.txt).
