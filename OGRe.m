@@ -1,15 +1,31 @@
 (* ::Package:: *)
 
 
-(* OGRe: An (O)bject-Oriented (G)eneral (Re)lativity Package for Mathematica *)
-(*            By Barak Shoshany (baraksh@gmail.com) (baraksh.com)            *)
-(*                     https://github.com/bshoshany/OGRe                     *)
-(*     Copyright (c) 2021 Barak Shoshany. Licensed under the MIT license.    *)
+(*
+OGRe: An (O)bject-Oriented (G)eneral (Re)lativity Package for Mathematica
+By Barak Shoshany (baraksh@gmail.com) (baraksh.com)
+GitHub repository: https://github.com/bshoshany/OGRe
+Copyright (c) 2021 Barak Shoshany. Licensed under the MIT license.
 
-(* If you use this package in published research, please cite it as follows: *)
-(*    Barak Shoshany, "OGRe: An Object-Oriented General Relativity Package   *)
-(*        for Mathematica", doi:10.5281/zenodo.4742935 (May 2021)            *)
+If you use this package in published research, please cite it as follows:
 
+* Shoshany, B., (2021). OGRe: An Object-Oriented General Relativity Package for Mathematica. Journal of Open Source Software, 6(65), 3416, https://doi.org/10.21105/joss.03416
+
+You can also use the following BibTeX entry:
+
+@article{Shoshany2021,
+    author    = {Barak Shoshany},
+    doi       = {10.21105/joss.03416},
+    journal   = {Journal of Open Source Software},
+    number    = {65},
+    pages     = {3416},
+    publisher = {The Open Journal},
+    title     = {OGRe: An Object-Oriented General Relativity Package for Mathematica},
+    url       = {https://doi.org/10.21105/joss.03416},
+    volume    = {6},
+    year      = {2021}
+}
+*)
 
 BeginPackage["OGRe`"];
 
@@ -85,7 +101,7 @@ Begin["`Private`"]; (* OGRe`Private` *)
 
 
 (* DO NOT change the format of the next line. It is used by TCheckForUpdates to detect the version of this file. Changing it will break the automatic update mechanism. Only change the version number and date. *)
-OGReVersion = "v1.6 (2021-08-07)";
+OGReVersion = "v1.6.1 (2021-09-01)";
 
 
 (* The raw URL of this file on GitHub. *)

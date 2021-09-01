@@ -1,4 +1,4 @@
-[![DOI:10.5281/zenodo.4742935](https://zenodo.org/badge/DOI/10.5281/zenodo.4742935.svg)](https://doi.org/10.5281/zenodo.4742935)
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.03416/status.svg)](https://doi.org/10.21105/joss.03416)
 [![License: MIT](https://img.shields.io/github/license/bshoshany/thread-pool)](https://github.com/bshoshany/OGRe/blob/master/LICENSE.txt)
 ![Language: Mathematica 12](https://img.shields.io/badge/Language-Mathematica%2012-yellow)
 ![File size in bytes](https://img.shields.io/github/size/bshoshany/OGRe/OGRe.m)
@@ -13,7 +13,7 @@
 Department of Physics, Brock University,\
 1812 Sir Isaac Brock Way, St. Catharines, Ontario, L2S 3A1, Canada\
 [bshoshany@brocku.ca](mailto:bshoshany@brocku.ca) | [https://baraksh.com/](https://baraksh.com/)\
-DOI: [doi:10.5281/zenodo.4742935](https://doi.org/10.5281/zenodo.4742935)
+DOI: [10.21105/joss.03416](https://doi.org/10.21105/joss.03416)
 
 * [Summary](#summary)
 * [Features](#features)
@@ -88,16 +88,21 @@ Copyright (c) 2021 [Barak Shoshany](http://baraksh.com). Licensed under the [MIT
 
 If you use this package in published research, please cite it as follows:
 
-* Barak Shoshany, "OGRe: An Object-Oriented General Relativity Package for Mathematica", [doi:10.5281/zenodo.4742935](https://doi.org/10.5281/zenodo.4742935) (May 2021)
+* Shoshany, B., (2021). OGRe: An Object-Oriented General Relativity Package for Mathematica. Journal of Open Source Software, 6(65), 3416, https://doi.org/10.21105/joss.03416
 
-You can use the following BibTeX entry:
+You can also use the following BibTeX entry:
 
 ```none
-@article{Shoshany2021_OGRe,
-    author = {Barak Shoshany},
-    doi    = {10.5281/zenodo.4742935},
-    month  = {May},
-    title  = {{OGRe: An Object-Oriented General Relativity Package for Mathematica}},
-    year   = {2021}
+@article{Shoshany2021,
+    author    = {Barak Shoshany},
+    doi       = {10.21105/joss.03416},
+    journal   = {Journal of Open Source Software},
+    number    = {65},
+    pages     = {3416},
+    publisher = {The Open Journal},
+    title     = {OGRe: An Object-Oriented General Relativity Package for Mathematica},
+    url       = {https://doi.org/10.21105/joss.03416},
+    volume    = {6},
+    year      = {2021}
 }
 ```
