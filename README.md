@@ -1,4 +1,5 @@
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.03416/status.svg)](https://doi.org/10.21105/joss.03416)
+[![arXiv:2109.04193](https://img.shields.io/badge/arXiv-2109.04193-b31b1b.svg)](https://arxiv.org/abs/2109.04193)
 [![License: MIT](https://img.shields.io/github/license/bshoshany/thread-pool)](https://github.com/bshoshany/OGRe/blob/master/LICENSE.txt)
 ![Language: Mathematica 12](https://img.shields.io/badge/Language-Mathematica%2012-yellow)
 ![File size in bytes](https://img.shields.io/github/size/bshoshany/OGRe/OGRe.m)
@@ -41,13 +42,14 @@ I initially created OGRe for use in my own research, so I made it as flexible an
 * Define coordinate systems and the transformation rules between them. Tensor components are then transformed automatically between coordinates behind the scenes as needed.
 * Each tensor is associated with a specific metric. Tensor components are then transformed automatically between different index configurations, raising and lowering indices behind the scenes as needed.
 * Display any tensor in any index configuration and coordinate system, either in vector/matrix form or as a list of all unique non-zero elements. Metrics can also be displayed as a line element.
-* Automatically simplify tensor components, optionally with user-defined simplification assumptions. Simplifications can be parallelized for a significant performance boost.
+* Automatically simplify tensor components, optionally with user-defined simplification assumptions. Simplifications can be parallelized for a significant performance boost. The user may utilize the package's simplification algorithm for any Mathematica expression, not just tensors.
 * Export tensors to a Mathematica notebook or to a file, so they can later be imported into another Mathematica session without having to redefine them from scratch.
 * Highly customizable. User settings are exported and imported along with the tensors. Some settings are persistent between sessions.
 * Easily calculate arbitrary tensor formulas using any combination of addition, multiplication by scalar, trace, contraction, partial derivative, and covariant derivative.
 * Built-in modules for calculating the Christoffel symbols (Levi-Civita connection), Riemann tensor, Ricci tensor and scalar, Einstein tensor, curve Lagrangian, and volume element from a metric.
-* Calculate the geodesic equation, in two different ways: from the Christoffel symbols or from the curve Lagrangian.
-* Built with speed and performance in mind, using optimized algorithms designed specifically for this package.
+* Calculate the norm-squared of tensors of any rank.
+* Calculate the geodesic equations in terms of a user-defined affine curve parameter, in two different ways: from the Christoffel symbols or from the curve Lagrangian. For spacetime metrics, the geodesic equations can be calculated in terms of the time coordinate.
+* Designed with speed and performance in mind, using optimized algorithms designed specifically for this package.
 * Fully portable. Can be imported directly from the web into any Mathematica notebook, without downloading or installing anything. Integrates seamlessly with the Wolfram Cloud.
 * Clear and detailed documentation, with many examples, in both [Mathematica notebook](OGRe_Documentation.nb) and [PDF](OGRe_Documentation.pdf) format. Detailed usage messages are also provided.
 * Open source. The code is extensively documented; please feel free to fork and modify it as you see fit.
@@ -80,7 +82,7 @@ Once the package is loaded, the documentation can be easily accessed by executin
 
 This package is under continuous and active development. If you encounter any bugs, or if you would like to request any additional features, please feel free to [open a new issue on GitHub](https://github.com/bshoshany/OGRe/issues) and I will look into it as soon as I can.
 
-Contributions are always welcome. However, I release my projects in cumulative updates after editing them locally on my system, so my policy is not to accept any pull requests. If you open a pull request, and I decide to incorporate it into the code, I will first perform some tests to ensure that the change doesn't break anything, and then merge it into the next release of the project, possibly together with some other changes, and along with a version bump and a corresponding note in `CHANGELOG.md` with a link to the pull request.
+Contributions are always welcome. However, I release my projects in cumulative updates after editing and testing them locally on my system, so my policy is not to accept any pull requests. If you open a pull request, and I decide to incorporate your suggestion into the project, I will first modify your code to comply with the project's coding conventions (formatting, syntax, naming, comments, programming practices, etc.), and perform some tests to ensure that the change doesn't break anything. I will then merge it into the next release of the project, possibly together with some other changes. The new release will also include a note in `CHANGELOG.md` with a link to your pull request, and modifications to the documentation in `README.md` as needed.
 
 ## Copyright and citing
 
@@ -88,12 +90,12 @@ Copyright (c) 2021 [Barak Shoshany](http://baraksh.com). Licensed under the [MIT
 
 If you use this package in published research, please cite it as follows:
 
-* Shoshany, B., (2021). OGRe: An Object-Oriented General Relativity Package for Mathematica. Journal of Open Source Software, 6(65), 3416, https://doi.org/10.21105/joss.03416
+* Shoshany, B., (2021). OGRe: An Object-Oriented General Relativity Package for Mathematica. Journal of Open Source Software, 6(65), 3416, <https://doi.org/10.21105/joss.03416>
 
 You can also use the following BibTeX entry:
 
 ```none
-@article{Shoshany2021,
+@article{Shoshany2021_OGRe,
     author    = {Barak Shoshany},
     doi       = {10.21105/joss.03416},
     journal   = {Journal of Open Source Software},

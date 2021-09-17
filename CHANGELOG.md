@@ -1,4 +1,5 @@
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.03416/status.svg)](https://doi.org/10.21105/joss.03416)
+[![arXiv:2109.04193](https://img.shields.io/badge/arXiv-2109.04193-b31b1b.svg)](https://arxiv.org/abs/2109.04193)
 [![License: MIT](https://img.shields.io/github/license/bshoshany/thread-pool)](https://github.com/bshoshany/OGRe/blob/master/LICENSE.txt)
 ![Language: Mathematica 12](https://img.shields.io/badge/Language-Mathematica%2012-yellow)
 ![File size in bytes](https://img.shields.io/github/size/bshoshany/OGRe/OGRe.m)
@@ -16,6 +17,7 @@ Department of Physics, Brock University,\
 DOI: [10.21105/joss.03416](https://doi.org/10.21105/joss.03416)
 
 * [Version history](#version-history)
+    * [v1.7.0 (2021-09-17)](#v170-2021-09-17)
     * [v1.6.1 (2021-09-01)](#v161-2021-09-01)
     * [v1.6 (2021-08-07)](#v16-2021-08-07)
     * [v1.5 (2021-06-07)](#v15-2021-06-07)
@@ -26,6 +28,26 @@ DOI: [10.21105/joss.03416](https://doi.org/10.21105/joss.03416)
     * [v1.0 (2021-02-10)](#v10-2021-02-10)
 
 ## Version history
+
+### v1.7.0 (2021-09-17)
+
+* New modules:
+    * `TCalcGeodesicWithTimeParameter[]` calculates the geodesic equations with respect to the time parameter (which is assumed to be the first coordinate) instead of an affine curve parameter.
+    * `TCalcNormSquared[]` calculates the norm-squared of a tensor with respect to its metric, that is, the tensor contracted with itself in all indices. For example, for a vector v<sup>&mu;</sup> the norm-squared will be v<sup>&mu;</sup>v<sub>&mu;</sub> and for a rank-2 tensor T<sup>&mu;&nu;</sup> the result will be T<sup>&mu;&nu;</sup> T<sub>&mu;&nu;</sub>.
+    * `TCite[]` displays information on how to cite this package in published research. Thank you for citing my work! :)
+* Changes to existing modules:
+    * `TCalc*` modules no longer display a progress bar for the calculation. The progress bar wasn't too useful, since almost all tensor calculations are very fast even on an average laptop. Simplifications are the only operations which take any considerable amount of time, and thus progress bars are now displayed only for simplifications.
+    * `TCovariantD` and `TPartialD`:
+        * If `TCovariantD` is used on a scalar, it is now replaced automatically with `TPartialD` to improve performance, since the covariant derivative of a scalar is just a partial derivative anyway.
+        * Fixed bug where acting on scalars incorrectly returned a list of lists instead of a vector.
+    * `TGetComponents` now applies a function given in the last argument to the components, and then simplifies them (in parallel, if parallelization is enabled), before returning the components. Note that `TShow` and `TList` have already had this option for some time, but now `TGetComponents` has it too.
+    * `TLineElement` now simplifies the line element before returning it.
+    * `TSimplify` now allows the user to simplify any expression, not just tensor objects. `TSimplify[expression]` simplifies `expression` based on the user-defined simplification assumptions set using `TSetAssumptions`. If `expression` is a `List`, the components will be simplified in parallel. The user can thus make use of OGRe's optimized simplification process to simplify any Mathematica expression.
+* Other changes:
+    * Fixed a bug where simplification assumptions were not applied correctly if parallelization was enabled.
+    * Added arXiv badge to `README.md` and `CHANGELOG.md`.
+    * Added a `CITATION.cff` file (in YAML format) to the GitHub repository. This should add [an option to get a citation in different formats](https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/creating-a-repository-on-github/about-citation-files) directly from GitHub repository by clicking on "cite this repository" on the sidebar to the right.
+    * Added a `CITATION.bib` file (in BibTeX format) to the GitHub repository. You can use it to easily cite this package in your papers.
 
 ### v1.6.1 (2021-09-01)
 

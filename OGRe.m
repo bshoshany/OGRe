@@ -13,7 +13,7 @@ If you use this package in published research, please cite it as follows:
 
 You can also use the following BibTeX entry:
 
-@article{Shoshany2021,
+@article{Shoshany2021_OGRe,
     author    = {Barak Shoshany},
     doi       = {10.21105/joss.03416},
     journal   = {Journal of Open Source Software},
@@ -59,7 +59,9 @@ Null[{
     TCalcEinsteinTensor,
     TCalcGeodesicFromChristoffel,
     TCalcGeodesicFromLagrangian,
+    TCalcGeodesicWithTimeParameter,
     TCalcLagrangian,
+    TCalcNormSquared,
     TCalcRicciScalar,
     TCalcRicciTensor,
     TCalcRiemannTensor,
@@ -68,6 +70,7 @@ Null[{
     TChangeID,
     TChangeSymbol,
     TCheckForUpdates,
+    TCite,
     TCovariantD,
     TDelete,
     TDocs,
@@ -101,7 +104,7 @@ Begin["`Private`"]; (* OGRe`Private` *)
 
 
 (* DO NOT change the format of the next line. It is used by TCheckForUpdates to detect the version of this file. Changing it will break the automatic update mechanism. Only change the version number and date. *)
-OGReVersion = "v1.6.1 (2021-09-01)";
+OGReVersion = "v1.7.0 (2021-09-17)";
 
 
 (* The raw URL of this file on GitHub. *)
@@ -251,11 +254,9 @@ TCalc[LHSTensorID_String[LHSIndices_String], RHSExpression_, symbol_String : Def
     {
         allVars,
         components,
-        leafCount,
         LHSVars,
         newComponents,
         newIndices,
-        progress,
         result,
         resultID,
         resultIndices,
@@ -270,8 +271,6 @@ TCalc[LHSTensorID_String[LHSIndices_String], RHSExpression_, symbol_String : Def
     (* Then *)
         CheckIfOverwriting[LHSTensorID];
     ];
-    (* Record the initial leaf count of the expression to be calculated. It will be used to advance the progress bar, since the leaf count decreases with (almost) every operation. *)
-    leafCount = LeafCount[RHSExpression];
     (* Define the rules for computing tensor formulas. *)
     rules = {
         (* Trace *)
@@ -293,16 +292,8 @@ TCalc[LHSTensorID_String[LHSIndices_String], RHSExpression_, symbol_String : Def
         TCovariantD[derivativeIndex_String] . tensorID_String[tensorIndices_String] :>
             CovariantDivOrGrad[derivativeIndex, TensorTrace[tensorID[tensorIndices]]]
     };
-    (* Print a dynamic progress indicator. *)
-    progress = 0;
-    PrintTemporary["Calculation progress: ", ProgressIndicator[Dynamic[progress], {0, 1}]];
-    (* Repeatedly replace tensor operations with their results until we reach a fixed point. Note that we use NestWhile instead of  ReplaceRepeated here so that we can report progress to the user. *)
-    result = NestWhile[(
-        result = ReplaceAll[#, rules];
-        progress = 1 - LeafCount[result] / leafCount;
-        result
-    ) &, RHSExpression, UnsameQ, 2];
-    progress = 1;
+    (* Repeatedly replace tensor operations with their results until we reach a fixed point. *)
+    result = ReplaceRepeated[RHSExpression, rules];
     (* Check that the result is valid, i.e. of the form "tensorID"["indices"]. *)
     If[
         !MatchQ[result, _String[_String]],
@@ -552,6 +543,130 @@ TCalcGeodesicFromChristoffel[metricID_String, coordinatesID_String : "_UseDefaul
 ];
 
 
+CreateUsageMessage[TCalcGeodesicWithTimeParameter, "TCalcGeodesicWithTimeParameter[`metricID`, `coordinatesID`] calculates the geodesic equations obtained for each of the coordinates in `coordinatesID` using the Christoffel symbols of the metric `metricID` and stores the result in a new rank-1 tensor object with ID \"`metricID`GeodesicFromChristoffel\". Equating the components to zero will yield the full system of geodesic equations.
+The result will be given in terms of the spatial coordinate symbols as functions of the time coordinate and their derivatives with respect to time. The first coordinate of `coordinatesID` will be assumed to be the time coordinate, even if its symbol is not t.
+If `coordinatesID` is not specified, the default coordinate system of the metric will be used."]
+TCalcGeodesicWithTimeParameter::ErrorNotMetric = "The geodesic equation vector can only be calculated from a tensor object representing a metric.";
+TCalcGeodesicWithTimeParameter[metricID_String, coordinatesID_String : "_UseDefault_"] := Module[
+    {
+        accelComponents,
+        accelID,
+        christComponents,
+        christID,
+        christWith0Components,
+        christWith0ID,
+        coordSymbols,
+        coordSymbolsWithoutTime,
+        newID = metricID <> "GeodesicWithTimeParameter",
+        parameter,
+        tangentComponents,
+        tangentID,
+        tempMetricComponents,
+        tempMetricID,
+        useCoords
+    },
+    (* Check that metricID exists. *)
+    CheckIfTensorExists[metricID];
+    (* Check that metricID is indeed a metric. *)
+    If[
+        TensorData[metricID]["Role"] =!= "Metric",
+    (* Then *)
+        Message[TCalcGeodesicWithTimeParameter::ErrorNotMetric];
+        Abort[];
+    ];
+    (* If a specific coordinate system is not given, use the metric's default coordinate system. *)
+    If[
+        coordinatesID === "_UseDefault_",
+    (* Then *)
+        useCoords = TensorData[metricID]["DefaultCoords"],
+    (* Else *)
+        (* Check that the tensor object coordinatesID exists and represents a coordinate system. *)
+        CheckIfTensorExists[coordinatesID];
+        CheckIfCoordinates[coordinatesID];
+        useCoords = coordinatesID;
+    ];
+    (* If the Christoffel symbols were not already calculated, calculate them now. This should be done first, otherwise the temporary tensors will be deleted prematurely when TCalc finishes. *)
+    If[
+        !KeyExistsQ[TensorData, metricID <> "Christoffel"],
+    (* Then *)
+        TCalcChristoffel[metricID];
+    ];
+    (* Make sure we have the components of the Christoffel symbols in the correct coordinate system. *)
+    AddRepresentation[metricID <> "Christoffel", {1, -1, -1}, useCoords];
+    coordSymbols = TensorData[useCoords]["Components"][{{1}, useCoords}];
+    (* Use the first coordinate as the curve parameter. *)
+    parameter = coordSymbols[[1]];
+    (* For the replacements below we only want to replace the non-time coordinates. *)
+    coordSymbolsWithoutTime = coordSymbols[[2 ;;]];
+    (* Define a temporary metric with any instance of the coordinate symbols, except t, replaced with coordinate functions in terms of t. For example, with coordinates {t, x, y, z}, the expression z * f[x, y] will be replaced with z[t] * f[t, x[t], y[t]]. *)
+    tempMetricID = NewTempID[];
+    tempMetricComponents = TensorData[metricID]["Components"][{{-1, -1}, useCoords}] /. (# -> #[parameter] & /@ coordSymbolsWithoutTime);
+    SetTensorID[tempMetricID, Association[
+        "Components" -> Association[{{-1, -1}, useCoords} -> tempMetricComponents],
+        "DefaultCoords" -> useCoords,
+        "DefaultIndices" -> {-1, -1},
+        "Metric" -> tempMetricID,
+        "Role" -> "Temporary",
+        "Symbol" -> TensorData[metricID]["Symbol"]
+    ]];
+    (* Define a temporary vector representing the tangent vector to the curve. The vector consists of the derivatives of the coordinates with respect to t, thus the first component will be equal to 1. The vector will be associated to the metric tempMetricID. *)
+    tangentID = NewTempID[];
+    tangentComponents = coordSymbols /. ((# -> #'[parameter]) & /@ coordSymbolsWithoutTime);
+    tangentComponents[[1]] = 1;
+    SetTensorID[tangentID, Association[
+        "Components" -> Association[{{1}, useCoords} -> tangentComponents],
+        "DefaultCoords" -> useCoords,
+        "DefaultIndices" -> {1},
+        "Metric" -> tempMetricID,
+        "Role" -> "Temporary",
+        "Symbol" -> OverDot[TensorData[useCoords]["Symbol"]]
+    ]];
+    (* Define a temporary vector representing the acceleration of the curve. The vector consists of the second derivatives of the coordinates with respect to t, thus the first component will be equal to 0. The vector will be associated to the metric tempMetricID. *)
+    accelID = NewTempID[];
+    accelComponents = coordSymbols /. ((# -> #''[parameter]) & /@ coordSymbolsWithoutTime);
+    accelComponents[[1]] = 0;
+    SetTensorID[accelID, Association[
+        "Components" -> Association[{{1}, useCoords} -> accelComponents],
+        "DefaultCoords" -> useCoords,
+        "DefaultIndices" -> {1},
+        "Metric" -> tempMetricID,
+        "Role" -> "Temporary",
+        "Symbol" -> Overscript[TensorData[useCoords]["Symbol"], "\[DoubleDot]"]
+    ]];
+    (* Copy the Christoffel symbols to a new temporary tensor associated with the new metric and replace the coordinate symbols, except t, with coordinate functions of t as above. *)
+    christID = NewTempID[];
+    christComponents = TensorData[metricID <> "Christoffel"]["Components"][{{1, -1, -1}, useCoords}] /. (# -> #[parameter] & /@ coordSymbolsWithoutTime);
+    SetTensorID[christID, Association[
+        "Components" -> Association[{{1, -1, -1}, useCoords} -> christComponents],
+        "DefaultCoords" -> useCoords,
+        "DefaultIndices" -> {1, -1, -1},
+        "Metric" -> tempMetricID,
+        "Role" -> "Christoffel",
+        "Symbol" -> "\[CapitalGamma]"
+    ]];
+    (* For the geodesic equations in terms of t, we also need the Christoffel symbols with 0 in the first index, which is a rank-2 tensor. The following is just a temporary solution until I implement the option to do something like christID["0AB"] and get the components automatically. *)
+    christWith0ID = NewTempID[];
+    christWith0Components = christComponents[[1, All, All]];
+    SetTensorID[christWith0ID, Association[
+        "Components" -> Association[{{-1, -1}, useCoords} -> christWith0Components],
+        "DefaultCoords" -> useCoords,
+        "DefaultIndices" -> {-1, -1},
+        "Metric" -> tempMetricID,
+        "Role" -> "Temporary",
+        "Symbol" -> "\[CapitalGamma]"
+    ]];
+    (* Calculate the geodesic equation vector and give it the symbol 0 since it is equal to the zero vector. *)
+    TCalc[newID, accelID["\[Sigma]"] + (christID["\[Sigma]\[Mu]\[Nu]"] - christWith0ID["\[Mu]\[Nu]"] . tangentID["\[Sigma]"]) . tangentID["\[Mu]"] . tangentID["\[Nu]"], "0"];
+    (* Delete the copy of the Christoffel symbols tensor. We did not mark it as temporary, to ensure that it is correctly treated as Christoffel symbols and not as a proper tensor, therefore TCalc will not remove it automatically. *)
+    RemoveTensorID[christID];
+    (* Change the geodesic equation vector's associated metric back to the original metric. *)
+    ChangeTensorKey[newID, "Metric", metricID];
+    (* Set the geodesic equation vector's role. *)
+    ChangeTensorKey[newID, "Role", "GeodesicWithTimeParameter"];
+    Return[newID];
+];
+
+
 CreateUsageMessage[TCalcGeodesicFromLagrangian, "TCalcGeodesicFromLagrangian[`metricID`, `coordinatesID`] calculates the geodesic equations obtained for each of the coordinates in `coordinatesID` using the curve Lagrangian of the metric `metricID` and stores the result in a new rank-1 tensor object with ID \"`metricID`GeodesicFromLagrangian\". Equating the components to zero will yield the full system of geodesic equations.
 Derivatives with respect to the curve parameter in the Euler-Lagrange equation will be left unevaluated using Inactive[], which can sometimes help solve the geodesic equations by inspection. Use Activate[] to evaluate the derivatives.
 The result will be given in terms of the coordinate symbols as functions of the curve parameter and their derivatives with respect to the curve parameter. The curve parameter can be selected using TSetCurveParameter[].
@@ -676,6 +791,29 @@ TCalcLagrangian[metricID_String, coordinatesID_String : "_UseDefault_"] := Modul
     (* Set the Lagrangian's role. *)
     ChangeTensorKey[newID, "Role", "Lagrangian"];
     Return[newID];
+];
+
+
+CreateUsageMessage[TCalcNormSquared, "TCalcNormSquared[`tensorID` calculates the norm-squared of the tensor `tensorID` with respect to its metric, that is, the tensor contracted with itself in all indices. For example, for a vector v^a the norm-squared will be v^a v_a and for a rank-2 tensor T^ab the result will be T^ab T_ab. The result is stored in a new rank-0 tensor object with ID \"`tensorID`NormSquared\"."];
+TCalcNormSquared[tensorID_String] := Module[
+    {
+        indices,
+        NormSquaredID,
+        rank
+    },
+    (* Check that tensorID exists. *)
+    CheckIfTensorExists[tensorID];
+    (* Get the tensor's rank so we know how many indices to contract, and prepare the index string. *)
+    rank = Length[TensorData[tensorID]["DefaultIndices"]];
+    indices = StringTake[DefaultIndexLetters, rank];
+    (* Calculate the norm squared, and give the tensor object the correct ID. The symbol will be left as the default. *)
+    NormSquaredID = TCalc[
+        (tensorID <> "NormSquared")[""],
+        tensorID[indices] . tensorID[indices]
+    ];
+    (* Set the role of the tensor to NormSquared for future reference. *)
+    ChangeTensorKey[NormSquaredID, "Role", "NormSquared"];
+    Return[NormSquaredID];
 ];
 
 
@@ -947,6 +1085,42 @@ TCheckForUpdates[] := Module[
 ];
 
 
+CreateUsageMessage[TCite, "TCite[] displays information on how to cite this package in published research. Thank you for citing my work! :)"];
+TCite[] := CellPrint[{
+    Cell[
+        "If you use this package in published research, please cite it as follows:",
+        "Text"
+    ],
+    Cell[
+        "Shoshany, B., (2021). OGRe: An Object-Oriented General Relativity Package for Mathematica. Journal of Open Source Software, 6(65), 3416, https://doi.org/10.21105/joss.03416",
+        "Item"
+    ],
+    Cell[
+        "You can also use the following BibTeX entry:",
+        "Text"
+    ],
+    Cell[
+        "@article{Shoshany2021_OGRe,
+    author    = {Barak Shoshany},
+    doi       = {10.21105/joss.03416},
+    journal   = {Journal of Open Source Software},
+    number    = {65},
+    pages     = {3416},
+    publisher = {The Open Journal},
+    title     = {OGRe: An Object-Oriented General Relativity Package for Mathematica},
+    url       = {https://doi.org/10.21105/joss.03416},
+    volume    = {6},
+    year      = {2021}
+}",
+        "Program"
+    ],
+    Cell[
+        "Thank you for citing my work! :)",
+        "Text"
+    ]
+}];
+
+
 CreateUsageMessage[TDelete, "TDelete[`ID`] permanently deletes the tensor object `ID`. If the tensor is a metric or coordinate system, it cannot be deleted unless all tensors referring to it have been deleted first."];
 TDelete::ErrorMetric = "The metric \"`1`\" cannot be deleted, as it has been used to define the tensor \"`2`\". To delete the metric, first delete \"`2`\" and any other tensors defined using this metric.";
 TDelete::ErrorCoords = "The coordinate system \"`1`\" cannot be deleted, as it is the default coordinate system of the tensor \"`2`\". To delete the coordinate system, first change the default coordinate system of \"`2`\" and any other relevant tensors.";
@@ -1022,9 +1196,10 @@ TExportAll[filename_String] := Module[
 
 CreateUsageMessage[TGetComponents, "TGetComponents[`ID`, `indices`, `coordinatesID`] extracts the components of the tensor object `ID` with the index configuration `indices` and in the coordinate system `coordinatesID` as a list.
 `indices` must be a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index.
-If `indices` and/or `coordinatesID` are omitted, the default values are used, and a message will let the user know which representation the components are given in, to avoid confusion."];
+If `indices` and/or `coordinatesID` are omitted, the default values are used, and a message will let the user know which representation the components are given in, to avoid confusion.
+TGetComponents[`ID`, `indices`, `coordinatesID`, `function`] maps `function` to each of the tensor's elements, and then automatically simplifies them, before they are returned. Typically this would be ReplaceAll[rules] to apply the rules to the elements, but any function can be used."];
 TGetComponents::UsingDefault = "Using `1`.";
-TGetComponents[ID_String, indices_List : {"_UseDefault_"}, coordinatesID_String : "_UseDefault_"] := Module[
+TGetComponents[ID_String, indices_List : {"_UseDefault_"}, coordinatesID_String : "_UseDefault_", function_ : Identity] /; (!ListQ[function] && !StringQ[function]) := Module[
     {
         components,
         useCoords,
@@ -1071,6 +1246,14 @@ TGetComponents[ID_String, indices_List : {"_UseDefault_"}, coordinatesID_String 
     ];
     (* Get the components of the tensor in the desired representation. They will be calculated if the representation is not yet stored in the tensor object. *)
     components = AddRepresentation[ID, useIndices, useCoords];
+    (* Apply the optional function to the components. *)
+    If[
+        function =!= Identity,
+    (* Then *)
+        components = Map[function, components, {ArrayDepth[components]}];
+        (* Simplify the components after applying the function. *)
+        components = TensorSimplify[components];
+    ];
     Return[components];
 ];
 
@@ -1201,7 +1384,7 @@ TLineElement[ID_String, coordinatesID_String : "_UseDefault_"] := Module[
     (* Get the metric's components in the desired representation, adding it if it does not already exist. *)
     components = AddRepresentation[ID, {-1, -1}, useCoords];
     (* Return the line element. *)
-    Return[Sum[components[[m, n]] * Symbol["\[DoubleStruckD]"<>ToString[coordSymbols[[m]]]] * Symbol["\[DoubleStruckD]"<>ToString[coordSymbols[[n]]]], {m, 1, dim}, {n, 1, dim}]];
+    Return[TensorSimplify[Sum[components[[m, n]] * Symbol["\[DoubleStruckD]"<>ToString[coordSymbols[[m]]]] * Symbol["\[DoubleStruckD]"<>ToString[coordSymbols[[n]]]], {m, 1, dim}, {n, 1, dim}]]];
 ];
 
 
@@ -1209,7 +1392,7 @@ CreateUsageMessage[TList, "TList[`ID`] lists the unique, non-zero components of 
 TList[`ID`, `indices`] lists the components in the index configuration `indices`, which should be a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index.
 TList[`ID`, `coordinatesID`] lists the components in the coordinate system `coordinatesID`.
 TList[`ID`, `indices`, `coordinatesID`] lists the components in the index configuration `indices` and the coordinate system `coordinatesID`.
-TList[`ID`, `function`] maps `function` to each of the tensor's elements before they are displayed. Typically this would be ReplaceAll[rules] to apply the rules to the elements, but any function can be used.
+TList[`ID`, `function`] maps `function` to each of the tensor's elements, and then automatically simplifies them, before they are displayed. Typically this would be ReplaceAll[rules] to apply the rules to the elements, but any function can be used.
 TList[`ID`, `indices`, `coordinatesID`, `function`] does all of the above; either `indices` or `coordinatesID` can be omitted."];
 TList[ID_String, indices_List : {"_UseDefault_"}, coordinatesID_String : "_UseDefault_", function_ : Identity] /; (!ListQ[function] && !StringQ[function]) := ShowList[ID, indices, coordinatesID, "List", function];
 
@@ -1581,17 +1764,20 @@ CreateUsageMessage[TShow, "TShow[`ID`] shows the components of the tensor object
 TShow[`ID`, `indices`] shows the components in the index configuration `indices`, which should be a list of the form {\[PlusMinus]1, \[PlusMinus]1, ...}, where +1 corresponds to an upper index and -1 corresponds to a lower index.
 TShow[`ID`, `coordinatesID`] shows the components in the coordinate system `coordinatesID`.
 TShow[`ID`, `indices`, `coordinatesID`] shows the components in the index configuration `indices` and the coordinate system `coordinatesID`.
-TShow[`ID`, `function`] maps `function` to each of the tensor's elements before they are displayed. Typically this would be ReplaceAll[rules] to apply the rules to the elements, but any function can be used.
+TShow[`ID`, `function`] maps `function` to each of the tensor's elements, and then automatically simplifies them, before they are displayed. Typically this would be ReplaceAll[rules] to apply the rules to the elements, but any function can be used.
 TShow[`ID`, `indices`, `coordinatesID`, `function`] does all of the above; either `indices` or `coordinatesID` can be omitted."];
 TShow[ID_String, indices_List : {"_UseDefault_"}, coordinatesID_String : "_UseDefault_", function_ : Identity] /; (!ListQ[function] && !StringQ[function]) := ShowList[ID, indices, coordinatesID, "Show", function];
 
 
-CreateUsageMessage[TSimplify, "TSimplify[`ID`] simplifies all previously-calculated representations of the tensor object `ID` based on the user-defined simplification assumptions set using TSetAssumptions[]. To be used if the assumptions have changed after the components have already been calculated."];
+CreateUsageMessage[TSimplify, "TSimplify[`ID`] simplifies all previously-calculated representations of the tensor object `ID` based on the user-defined simplification assumptions set using TSetAssumptions[]. To be used if the assumptions have changed after the components have already been calculated.
+TSimplify[`expression`] simplifies `expression` based on the user-defined simplification assumptions. If `expression` is a list, the components will be simplified in parallel.
+"];
 TSimplify[ID_String] := (
     CheckIfTensorExists[ID];
     ChangeTensorKey[ID, "Components", TensorSimplify /@ TensorData[ID]["Components"]];
     Return[ID];
 );
+TSimplify[expression_] := TensorSimplify[expression];
 
 
 CreateUsageMessage[TVolumeElementSquared, "TVolumeElement[`metricID`, `coordinatesID`] returns the determinant of the metric `metricID` in the coordinate system `coordinatesID`. If `coordinatesID` is not specified, the default coordinate system of the metric will be used. The square root of the determinant (or its negative, for a pseudo-Riemannian metric) is the volume element."];
@@ -2093,6 +2279,12 @@ CovariantDivOrGrad[derivativeIndex_String, tensorID_String[tensorIndices_String]
         useCoords,
         useIndices
     },
+    (* If the tensor is a scalar, then the covariant derivative reduces to the partial derivative. *)
+    If[
+        TensorData[tensorID]["DefaultIndices"] === {},
+    (* Then *)
+        Return[DivOrGrad[derivativeIndex, tensorID[tensorIndices]]];
+    ];
     (* If the Christoffel symbols were not already calculated, calculate them now. *)
     myChristoffel = TensorData[tensorID]["Metric"] <> "Christoffel";
     If[
@@ -2166,7 +2358,7 @@ DivOrGrad[derivativeIndex_String, tensorID_String[tensorIndices_String]] := Modu
     },
     (* Check that the tensor exists. *)
     CheckIfTensorExists[tensorID];
-    (* Check that the derivative has exactly once index. *)
+    (* Check that the derivative has exactly one index. *)
     If[
         StringLength[derivativeIndex] != 1,
     (* Then *)
@@ -2226,6 +2418,12 @@ DivOrGrad[derivativeIndex_String, tensorID_String[tensorIndices_String]] := Modu
     (* Let the user know the explicit operation we are performing, including the correct index placement. TODO: Uncomment this in a future version, once this feature works properly. *)
     (* PrintTemporary["Taking the partial derivative ", newSymbol, "..."]; *)
     (* Calculate the components of the new tensor by summing over the contracted variables and taking the derivatives of the tensor's components. *)
+    (* If the tensor is a scalar, then the components will be a list with 1 item. This will then lead to the resulting vector being a list of lists. Replacing the components with the single component itself solves that issue. *)
+    If[
+        TensorData[tensorID]["DefaultIndices"] === {},
+    (* Then *)
+        components = components[[1]];
+    ];
     newComponents = Table[
         If[
             Length[sumVars] > 0,
@@ -2494,8 +2692,8 @@ ShowList[ID_String, indices_List, coordinatesID_String, showOrList_String, funct
         (* Simplify the components after applying the function. *)
         components = TensorSimplify[components];
     ];
-    (* If the tensor is a curve Lagrangian or a geodesic vector, nicely format the functions and derivatives to produce a clean expression without explicitly displaying the curve parameter or the coordinates. *)
     coordSymbols = TensorData[useCoords]["Components"][{{1}, useCoords}];
+    (* If the tensor is a curve Lagrangian or a geodesic vector, nicely format the functions and derivatives to produce a clean expression without explicitly displaying the curve parameter or the coordinates. *)
     If[
         TensorData[ID]["Role"] === "Lagrangian" || TensorData[ID]["Role"] === "GeodesicFromChristoffel" || TensorData[ID]["Role"] === "GeodesicFromLagrangian",
     (* Then *)
@@ -2504,6 +2702,16 @@ ShowList[ID_String, indices_List, coordinatesID_String, showOrList_String, funct
             #'[curveParameter] -> OverDot[#],
             #''[curveParameter] -> OverDot[#, 2] (* Note: This shows a syntax error if entered in the front end, but works nevertheless... *)
             } & /@ coordSymbols];
+    ];
+    (* If the tensor is a geodesic vector with time as a parameter, do the same as above, with the first coordinate instead of the curve parameter. *)
+    If[
+        TensorData[ID]["Role"] === "GeodesicWithTimeParameter",
+    (* Then *)
+        components = components /. Flatten[{
+            #[coordSymbols[[1]]] -> #,
+            #'[coordSymbols[[1]]] -> OverDot[#],
+            #''[coordSymbols[[1]]] -> OverDot[#, 2]
+            } & /@ coordSymbols[[2 ;;]]];
     ];
     (* Display partial derivatives in a nicer way. This will apply to partial derivatives of any function with respect to any arguments, not just functions of the coordinates. *)
     components = components /. Derivative[orders__][f_][args__] :> Inactive[D][f[args], Sequence @@ Map[ReplaceAll[{arg_, order_} :> arg^order], DeleteCases[Transpose[{{args}, {orders}}], {_, 0}]]];
@@ -2721,7 +2929,6 @@ TensorSimplify[expression_] := Module[
                 None
             ]
         },
-        (* The flattening is for compatibility with v1.0, since the assumptions were not stored as a list in that version. *)
         Flatten[{TensorData[Options]["SimplifyAssumptions"]["User"]}]
     ];
     (* If the expression is not a list, or it's a list with just one component, then we don't need parallelization. *)
@@ -2732,7 +2939,8 @@ TensorSimplify[expression_] := Module[
     (* Else *)
         (* Print a dynamic progress indicator. The progress parameter will be shared between all kernels so they can update it. *)
         progress = 0;
-        SetSharedVariable[progress];
+        (* Share the progress parameter and simplification assumptions with all of the kernels. *)
+        SetSharedVariable[progress, assumptions];
         PrintTemporary["Simplification progress: ", ProgressIndicator[Dynamic[progress], {0, Times @@ Dimensions[expression]}]];
         If[
             TensorData[Options]["Parallelize"],
@@ -2740,7 +2948,16 @@ TensorSimplify[expression_] := Module[
             (* Submit the simplification of each element in the tensor as an individual task. Whenever a kernel becomes available, it will pick up the next available task. This results in better performance than ParallelMap. *)
             tasks = Map[
                 (* Using Block instead of Module here for maximum performance. *)
-                Function[element, ParallelSubmit[Block[{simplified = FullSimplify[element, assumptions]}, progress++; simplified]]],
+                Function[
+                    element,
+                    ParallelSubmit[
+                        Block[
+                            {simplified = FullSimplify[element, assumptions]},
+                            progress++;
+                            simplified
+                        ]
+                    ]
+                ],
                 expression,
                 {ArrayDepth[expression]}
             ];
@@ -2878,7 +3095,7 @@ TransformCoordinates[ID_String, indices_List, sourceID_String, targetID_String] 
         (* Define the variables in terms of which to calculate the Jacobian. *)
         oldVars = Unique[Table["old", {rank}]];
         newVars = Unique[Table["new", {rank}]];
-        (* If the Jacobians have not been calculated yet, calculate them now. This is only for compatibility with v1.0. *)
+        (* If the Jacobians have not already been calculated for some reason, calculate them now. *)
         If[
             !KeyExistsQ[TensorData[sourceID], "Jacobians"],
         (* Then *)
