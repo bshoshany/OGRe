@@ -1,12 +1,12 @@
-[![DOI](https://joss.theoj.org/papers/10.21105/joss.03416/status.svg)](https://doi.org/10.21105/joss.03416)
+[![Author: Barak Shoshany](https://img.shields.io/badge/author-Barak_Shoshany-009933)](https://baraksh.com/)
+[![DOI: 10.21105/joss.03416](https://joss.theoj.org/papers/10.21105/joss.03416/status.svg)](https://doi.org/10.21105/joss.03416)
 [![arXiv:2109.04193](https://img.shields.io/badge/arXiv-2109.04193-b31b1b.svg)](https://arxiv.org/abs/2109.04193)
-[![License: MIT](https://img.shields.io/github/license/bshoshany/thread-pool)](https://github.com/bshoshany/OGRe/blob/master/LICENSE.txt)
-![Language: Mathematica 12](https://img.shields.io/badge/Language-Mathematica%2012-yellow)
-![File size in bytes](https://img.shields.io/github/size/bshoshany/OGRe/OGRe.m)
-![GitHub last commit](https://img.shields.io/github/last-commit/bshoshany/OGRe)
-[![GitHub repo stars](https://img.shields.io/github/stars/bshoshany/OGRe?style=social)](https://github.com/bshoshany/OGRe)
-[![Twitter @BarakShoshany](https://img.shields.io/twitter/follow/BarakShoshany?style=social)](https://twitter.com/BarakShoshany)
-[![Open in Visual Studio Code](https://open.vscode.dev/badges/open-in-vscode.svg)](https://open.vscode.dev/bshoshany/OGRe)
+[![License: MIT](https://img.shields.io/github/license/bshoshany/OGRe)](https://github.com/bshoshany/OGRe/blob/master/LICENSE.txt)
+![Language: Mathematica 13](https://img.shields.io/badge/Language-Mathematica%2013-yellow)
+[![GitHub stars](https://img.shields.io/github/stars/bshoshany/OGRe?style=flat&color=009999)](https://github.com/bshoshany/OGRe/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/bshoshany/OGRe?style=flat&color=009999)](https://github.com/bshoshany/OGRe/forks)
+[![GitHub release](https://img.shields.io/github/v/release/bshoshany/OGRePy?color=660099)](https://github.com/bshoshany/OGRe/releases)
+[![Open in Visual Studio Code](https://img.shields.io/badge/Open_in_Visual_Studio_Code-007acc)](https://vscode.dev/github/bshoshany/OGRe)
 
 # OGRe: An Object-Oriented General Relativity Package for Mathematica
 
@@ -16,14 +16,16 @@ Department of Physics, Brock University,\
 [bshoshany@brocku.ca](mailto:bshoshany@brocku.ca) | [https://baraksh.com/](https://baraksh.com/)\
 DOI: [10.21105/joss.03416](https://doi.org/10.21105/joss.03416)
 
-* [Summary](#summary)
+* [Overview](#overview)
 * [Features](#features)
 * [Installing and loading the package](#installing-and-loading-the-package)
 * [Documentation](#documentation)
 * [Issue and pull request policy](#issue-and-pull-request-policy)
 * [Copyright and citing](#copyright-and-citing)
 
-## Summary
+## **Important Update 2024-09-04:** The Python port of this package, [OGRePy](https://github.com/bshoshany/OGRePy), is finally out! Install it with `pip install OGRePy`, and try it out in a Jupyter notebook in Visual Studio Code or JupyterLab. The development of OGRePy is one of the main reasons I have not released a new version of OGRe in almost 3 years, but now that it's done, I hope to finally release v2.0.0 of OGRe in the coming months. Stay tuned!
+
+## Overview
 
 OGRe is a modern Mathematica package for differential geometry and tensor calculus, designed to be both powerful and user-friendly. It can be used in a variety of contexts where tensor calculations are needed, in both mathematics and physics, but it is especially suitable for general relativity.
 
