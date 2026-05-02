@@ -1,12 +1,12 @@
-[![DOI](https://joss.theoj.org/papers/10.21105/joss.03416/status.svg)](https://doi.org/10.21105/joss.03416)
+[![Author: Barak Shoshany](https://img.shields.io/badge/author-Barak_Shoshany-009933)](https://baraksh.com/)
+[![DOI: 10.21105/joss.03416](https://joss.theoj.org/papers/10.21105/joss.03416/status.svg)](https://doi.org/10.21105/joss.03416)
 [![arXiv:2109.04193](https://img.shields.io/badge/arXiv-2109.04193-b31b1b.svg)](https://arxiv.org/abs/2109.04193)
-[![License: MIT](https://img.shields.io/github/license/bshoshany/thread-pool)](https://github.com/bshoshany/OGRe/blob/master/LICENSE.txt)
-![Language: Mathematica 12](https://img.shields.io/badge/Language-Mathematica%2012-yellow)
-![File size in bytes](https://img.shields.io/github/size/bshoshany/OGRe/OGRe.m)
-![GitHub last commit](https://img.shields.io/github/last-commit/bshoshany/OGRe)
-[![GitHub repo stars](https://img.shields.io/github/stars/bshoshany/OGRe?style=social)](https://github.com/bshoshany/OGRe)
-[![Twitter @BarakShoshany](https://img.shields.io/twitter/follow/BarakShoshany?style=social)](https://twitter.com/BarakShoshany)
-[![Open in Visual Studio Code](https://open.vscode.dev/badges/open-in-vscode.svg)](https://open.vscode.dev/bshoshany/OGRe)
+[![License: MIT](https://img.shields.io/github/license/bshoshany/OGRe)](https://github.com/bshoshany/OGRe/blob/master/LICENSE.txt)
+![Language: Mathematica 14](https://img.shields.io/badge/Language-Mathematica%2014-yellow)
+[![GitHub stars](https://img.shields.io/github/stars/bshoshany/OGRe?style=flat&color=009999)](https://github.com/bshoshany/OGRe/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/bshoshany/OGRe?style=flat&color=009999)](https://github.com/bshoshany/OGRe/forks)
+[![GitHub release](https://img.shields.io/github/v/release/bshoshany/OGRe?color=660099)](https://github.com/bshoshany/OGRe/releases)
+[![Open in Visual Studio Code](https://img.shields.io/badge/Open_in_Visual_Studio_Code-007acc)](https://vscode.dev/github/bshoshany/OGRe)
 
 # OGRe: An Object-Oriented General Relativity Package for Mathematica
 
@@ -17,6 +17,7 @@ Department of Physics, Brock University,\
 DOI: [10.21105/joss.03416](https://doi.org/10.21105/joss.03416)
 
 * [Version history](#version-history)
+    * [v2.0.0 (2026-05-02)](#v200-2026-05-02)
     * [v1.7.0 (2021-09-17)](#v170-2021-09-17)
     * [v1.6.1 (2021-09-01)](#v161-2021-09-01)
     * [v1.6 (2021-08-07)](#v16-2021-08-07)
@@ -28,6 +29,86 @@ DOI: [10.21105/joss.03416](https://doi.org/10.21105/joss.03416)
     * [v1.0 (2021-02-10)](#v10-2021-02-10)
 
 ## Version history
+
+### v2.0.0 (2026-05-02)
+
+* After a long time with no updates, a major OGRe update is finally here! This long-anticipated update includes numerous new features, improvements, and bug fixes. Many of these are due to feature requests, bug reports, and other feedback from the scientific community - submitted on GitHub, sent by email, or even discussed in person at conferences. More updates are coming soon!
+* **Breaking changes (may break pre-v2.0.0 code):**
+    * Replacing all `TCalc*` modules with cached references:
+        * The modules for built-in tensors derived from a metric: `TCalcChristoffel`, `TCalcEinsteinTensor`, `TCalcGeodesicFromChristoffel`, `TCalcGeodesicFromLagrangian`, `TCalcGeodesicWithTimeParameter`, `TCalcLagrangian`, `TCalcRicciScalar`, `TCalcRicciTensor`, and `TCalcRiemannTensor`, have been removed.
+        * They are replaced by new modules: `TChristoffel`, `TEinstein`, `TGeodesicFromChristoffel`, `TGeodesicFromLagrangian`, `TGeodesicWithTimeParameter`, `TLagrangian`, `TRicciScalar`, `TRicci`, and `TRiemann`.
+        * Unlike the `TCalc*` modules, the new modules do not perform a calculation every time they are called, and do not generate new user-accessible tensors with IDs of the form `"<metric><role>"` (such as `"SchwarzschildRiemann"`). Instead, the new modules perform the calculation only the first time they are called, and then cache the results internally and reuse them on subsequent calls. To access the calculated tensor, you don't use a separate tensor ID (like `"SchwarzschildRiemann"`); instead, you call the module directly every time (e.g. `TRiemann["Schwarzschild"]`).
+        * This new syntax can be used with most modules that accept tensors, for example `TList[TRiemann["Schwarzschild"]]`, and also in arbitrary tensor calculations with indices using `TCalc[]`, for example `TCalc[TRiemann["Schwarzschild"]["\[Lambda]\[Mu]\[Lambda]\[Nu]"],"R"]`. The new design makes the package much more user-friendly and easy to use, and it avoids recalculating the same tensor multiple times, cluttering the namespace with many derived tensor IDs, and having to use long and confusing IDs like `"SchwarzschildRiemann"`.
+        * Internally, the tensors are cached inside the metric object itself, so they will be exported when using `TExport[]` on the metric. The new modules essentially just return special reference IDs of the form `"<metric>-><role>"`, with `->` separating the metric of origin from the tensor's role, for example `"Schwarzschild->Riemann"`. These references are then routed to the cached tensors automatically, but the user doesn't need to use the references directly; the new modules should be used instead.
+        * You cannot change the ID, symbol, or default indices/coordinates of the cached tensors.
+        * Tensor IDs created by the user can no longer contain `->`, as this is now reserved for references to cached tensors.
+        * **Migration guide for pre-v2.0.0 code:** Wherever you used a `TCalc*` module or a derived tensor ID, use the corresponding new module instead, noting that some module names have been shortened (the word `Tensor` was removed). For example, if before you used `TCalcEinsteinTensor["MyMetric"]` to calculate the Einstein tensor, and then used the tensor ID `"MyMetricEinsteinTensor"` to refer to the calculated tensor, now you should simply use `TEinstein["MyMetric"]` instead, in both cases.
+    * The module `TCalcNormSquared[]` has also been removed, and replaced by `TNormSquared[]`. The new module returns a scalar expression directly instead of creating a rank-0 tensor object, and accepts an optional coordinate system as the second argument. It does not cache the result, and it can be used for tensors of any type.
+        * **Migration guide for pre-v2.0.0 code:** Wherever you used `TCalcNormSquared[]` before, use `TNormSquared[]` now, and note that the result is given directly. For example, if before you used `TCalcNormSquared["MyTensor"]` and subsequently accessed the scalar component using `TGetComponents["MyTensorNormSquared"]`, now you should simply use `TNormSquared["MyTensor"]` instead and get the scalar directly.
+    * `TAddCoordTransformation[]` and `TChangeID[]` now use `,` instead of `->` to separate the first two arguments, so that tensor ID completion can work properly. The old `->` syntax has been removed, so old code using `->` will need to be updated to use the new syntax.
+        * **Migration guide for pre-v2.0.0 code:** Replace `TAddCoordTransformation["MyCoords1"->"MyCoords2",rules]` with `TAddCoordTransformation["MyCoords1","MyCoords2",rules]`. Replace `TChangeID["MyTensor1"->"MyTensor2"]` with `TChangeID["MyTensor1","MyTensor2"]`.
+    * `TVolumeElementSquared[]` has been renamed to `TMetricDeterminant[]`, as this is a more accurate name for what the module actually calculates, the determinant of the metric, which may be negative for pseudo-Riemannian metrics. A new module, `TVolumeElement[]`, calculates the actual volume element of a given metric in the form $\mathrm{d}V = \sqrt{|\det(g)|} \, {\mathrm{d}x}^{0} \wedge \cdots \wedge {\mathrm{d}x}^{n-1}$, where $n$ is the number of dimensions.
+        * **Migration guide for pre-v2.0.0 code:** Replace `TVolumeElementSquared["MyMetric"]` with `TMetricDeterminant["MyMetric"]`.
+* UI improvements:
+    * **Tensor ID completion:** A widely requested feature is now implemented, making OGRe much more user-friendly and easy to use! All OGRe modules that take existing tensor IDs as arguments will now show a dropdown menu with a list of relevant IDs - coordinate systems, metrics, and/or tensors - as soon as you type the opening double quotes for a string in a relevant argument position. Some other strings are also auto-completed, such as common symbols. For example:
+        * `TList["`, `TShow["`, and `TGetComponents["` will show a list of all tensors.
+        * `TRiemann["`, `TLagrangian["`, and `TGeodesicFromChristoffel["` will show a list of all metrics.
+        * `TAddCoordTransformation["`, `TNewMetric["MyMetric", "`, and `TNewTensor["MyTensor", "MyMetric", "` will show a list of all coordinate systems (for the first, second, and third argument respectively).
+        * `TNewMetric[..., "` will show a list of commonly used metric symbols (for the last argument).
+        * `TSetCurveParameter["` will show a list of commonly used curve parameter symbols.
+        * And so on.
+    * Added `SyntaxInformation` for all public modules. This allows Mathematica to indicate when an argument is missing, or if there are too many arguments.
+* New modules:
+    * `TKretschmann[]` calculates and caches the Kretschmann scalar of a metric.
+    * `TWeyl[]` calculates and caches the Weyl tensor of a metric.
+    * `TDim[]` returns the dimension of a tensor's manifold.
+    * `TRank[]` returns the rank of a tensor.
+    * `TSetSimplifyFunc[]` allows setting a custom simplification function.
+    * `TTeXShow[]` returns the output of `TShow[]` as a TeX string.
+    * `TTeXList[]` returns the output of `TList[]` as a TeX string.
+    * `TSetExactSignChecks[]` can be used to enable or disable exact sign checks. When exact sign checks are enabled (the default), if `TList` cannot detect equality of two components up to sign by direct comparison, it checks whether the sum of the components can be proven to equal zero, which may require simplification. For tensors with complicated components, this may take a long time, in which case this option can be disabled using `TSetExactSignChecks[False]`; however, `TList` will then only be able to detect when two components are the same up to sign in simple cases.
+* Changes to existing modules:
+    * `TInfo[]` now displays the dimension and rank.
+    * `TList[]`, `TShow[]`, and `TGetComponents[]`:
+        * The modules `TList[]`, `TShow[]`, and `TGetComponents[]` now accept a rule or a list of rules as an optional argument. This applies `ReplaceAll[rules]` to each of the tensor's elements, and then automatically simplifies them, before they are displayed or returned.
+        * The full syntax of these modules is now:
+            * `TList[ID, indices, coordinatesID, rules, function]`
+            * `TShow[ID, indices, coordinatesID, rules, function]`
+            * `TGetComponents[ID, indices, coordinatesID, rules, function]`
+        * Any of the arguments can be omitted. If both `rules` and `function` are given, the rules will be applied before the function.
+    * `TList[]` and `TShow[]` now use spacers instead of invisible letters to align the indices, which will make copied components less awkward (each index will only appear once).
+    * `TExportAll[]` and `TImportAll[]` now handle file errors better, add the `.m` extension if an extension is not provided (unless the file name explicitly ends with a dot), and print out the full path of the file as a hyperlink that can be clicked to open it directly in Mathematica.
+    * `TCheckForUpdates[]` now uses GitHub releases to check for updates, instead of looking directly into the source code. If a new version is available, it gives a link to the release notes, and also allows viewing the release notes directly in the notebook.
+    * `TDocs[]` now loads the documentation for the version of the package that is currently installed, instead of always loading the documentation for the latest version.
+    * `TImport[]` now checks if the metric and coordinates used by the imported tensor exist and have the correct dimension before importing.
+    * `TCovariantD[]` now preserves the default index configuration of the tensor, matching the behavior of `TPartialD[]` (previously, `TCovariantD[]` always acted on the representation with all upper indices).
+* Derivative shorthand notation:
+    * `TList[]` and `TShow[]` now use a clearer shorthand notation for derivatives. Previously the shorthand for something like `Derivative[1, 1, 2][f][x, y, z]` was $\partial_{x,y,z^2}f$, which was confusing, especially because it seems like the last derivative is with respect to $z^2$, rather than a second derivative with respect to $z$. Now the shorthand for the same is $\partial_x \partial_y \partial_z^2 f$, which more closely resembles familiar tensor notation.
+    * Additionally, the shorthand notation has been made more clear in cases where the derivative is taken to a power. Previously the shorthand for something like `a'[t]^2` was $\partial_t a^2$, which makes it look like the function itself is squared, instead of the derivative. Now the shorthand for the same is $(\partial_t a)^2$, which is much more clear.
+* Lagrangians, geodesic equations, and curve parameters:
+    * The `Lagrangian`, `GeodesicFromChristoffel`, `GeodesicFromLagrangian`, and `GeodesicWithTimeParameter` roles now transform correctly under coordinate transformations.
+    * All geodesic equation types now transform correctly under index transformations. The `GeodesicFromLagrangian` and `GeodesicFromChristoffel` roles now use the metric components evaluated along the curve, instead of the unmodified metric components. The `GeodesicWithTimeParameter` role now rejects index transformations, since these equations do not transform as a tensor.
+    * Internally, Lagrangians and affine-parameter geodesic equations are now stored using a placeholder for the curve parameter (`$CurveParam`). The placeholder is replaced with the user-selected curve parameter only when they are displayed or the components are retrieved. When exporting tensors using `TExport[]` or `TExportAll[]`, the tensors will be exported with the placeholder, so that when they are imported later, they will be imported correctly regardless of which curve parameter is currently selected. This also eliminates the need to change the curve parameter retroactively for all existing tensors when using `TSetCurveParameter[]`, which is how this worked before. However, `TExportAll[]` also exports the choice of user-facing curve parameter separately as part of the `Options` key, and it is imported when using `TImportAll[]`.
+    * The `GeodesicFromLagrangian` role now follows the Euler-Lagrange equations more rigorously: the defining representation now has a lower index, and the sign has been corrected.
+* Performance optimizations:
+    * Christoffel symbols, Riemann tensors, and Weyl tensors are recalculated directly when requested in a new coordinate system, instead of transforming the existing components. This improves performance, both because coordinate transformations on rank 3 or 4 tensors are slow, and because the directly calculated components are easier to simplify.
+    * Internally, all built-in tensors derived from a metric are now calculated directly from the component formulas instead of using `TCalc[]`, avoiding the overhead.
+* Bug fixes:
+    * Fixed the default index letters (previously, $\epsilon$ appeared twice and $\eta$ was unused).
+    * Fixed a bug where coordinate transformations with an incomplete `"Jacobians"` entry could fail to calculate the missing Jacobians for a specific target coordinate system.
+    * `TChangeDefaultIndices[]` now verifies that the desired indices have the correct rank.
+    * `TCalc[]` now shows an appropriate error message when trying to use a coordinate system as a tensor in any expression.
+    * `TAddCoordTransformation[]` now correctly aborts when provided with a non-invertible coordinate transformation.
+    * `TShow[]` and `TList[]` now correctly handle multi-letter coordinate symbols.
+* Documentation:
+    * The `README.md` file in the GitHub repository now includes the complete documentation for easier access, but **without cell outputs**. The Markdown file is compiled to create the `OGRe_Documentation.nb` notebook, which is then evaluated to generate the outputs. This also makes maintaining the documentation much easier.
+    * The documentation and usage messages have been corrected and clarified in many places.
+    * All error messages from internal modules are now displayed as `TMessage::<message_name>` instead of the awkward ``OGRe`Private`<module_name>::<message_name>``.
+    * Formulas now look nicer in the notebook.
+    * `OGRe_Documentation.nb` can now be opened with the free [Wolfram Player](https://www.wolfram.com/player/).
+    * The welcome message now provides links to the current release notes.
+* The package now has a comprehensive internal test suite which thoroughly tests all OGRe modules and verifies that it accurately reproduces a wide variety of known results from differential geometry and general relativity, ensuring users can fully trust OGRe as a reliable tool for research and pedagogy. This is currently used only internally, but will eventually be made available on the GitHub repository, once it matures a bit more and is cleaned up and properly documented.
+* This package now has a Python port, [OGRePy: An Object-Oriented General Relativity Package for Python](https://github.com/bshoshany/OGRePy). If you are interested in doing OGRe-style tensor calculations in Python, please check it out!
 
 ### v1.7.0 (2021-09-17)
 
@@ -46,7 +127,7 @@ DOI: [10.21105/joss.03416](https://doi.org/10.21105/joss.03416)
 * Other changes:
     * Fixed a bug where simplification assumptions were not applied correctly if parallelization was enabled.
     * Added arXiv badge to `README.md` and `CHANGELOG.md`.
-    * Added a `CITATION.cff` file (in YAML format) to the GitHub repository. This should add [an option to get a citation in different formats](https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/creating-a-repository-on-github/about-citation-files) directly from GitHub repository by clicking on "cite this repository" on the sidebar to the right.
+    * Added a `CITATION.cff` file (in YAML format) to the GitHub repository. This should add [an option to get citations in different formats](https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/creating-a-repository-on-github/about-citation-files) directly from the GitHub repository by clicking on "cite this repository" on the sidebar to the right.
     * Added a `CITATION.bib` file (in BibTeX format) to the GitHub repository. You can use it to easily cite this package in your papers.
 
 ### v1.6.1 (2021-09-01)
@@ -130,9 +211,9 @@ DOI: [10.21105/joss.03416](https://doi.org/10.21105/joss.03416)
         * Many usage messages have been simplified, improved, or clarified.
         * Fixed a bug where loading the package directly from GitHub led to usage messages not being displayed properly due to doubling of line breaks.
         * The way that usage messages are defined internally has also been simplified.
-    * Automatic checks for update:
+    * Automatic checks for updates:
         * The package now checks for new versions automatically at startup. No information (personal or otherwise) is sent or collected; the package simply checks the GitHub repository for updates. This check is done asynchronously, to prevent delaying the loading of the package.
-        * An upcoming release will introduce persistent storage of user settings, including a setting which will allow disabling the checks for update at startup. Until then, users interested in turning off these automatic checks can change the line `SessionSubmit[StartupCheckForUpdates[]];` in `OGRe.m` to `UpdateMessage = "Checking for updates is disabled.";`.
+        * An upcoming release will introduce persistent storage of user settings, including a setting which will allow disabling the checks for updates at startup. Until then, users interested in turning off these automatic checks can change the line `SessionSubmit[StartupCheckForUpdates[]];` in `OGRe.m` to `UpdateMessage = "Checking for updates is disabled.";`.
     * Fixed several lines in the code where a semicolon was missing at the end of the line, causing the code to not run correctly since Mathematica interprets newlines as multiplication by default.
     * This package now has a DOI for citation purposes. Information on how to cite it in publications has been added to the source code and to `README.md`.
     * Added GitHub badges to `README.md`.
@@ -152,7 +233,7 @@ DOI: [10.21105/joss.03416](https://doi.org/10.21105/joss.03416)
 * New modules:
     * `TDocs`: Opens the Mathematica notebook `OGRe_Documentation.nb` directly from the GitHub repository. This allows users to instantly access the latest documentation from any Mathematica session, whether the package itself was loaded locally or from GitHub.
     * `TParallelize`:
-        * Enables or disable the parallelization of tensor simplifications (see below). It is disabled by default.
+        * Enables or disables the parallelization of tensor simplifications (see below). It is disabled by default.
         * As a rule of thumb, if simplifications are taking less than a few seconds, then you should leave parallelization off, as it has a small overhead and may actually impede performance in that case. However, if simplifications are taking more than a few seconds, then it is highly recommended to enable parallelization for a significant performance boost.
         * This setting will be exported when using `TExportAll`, so it will be imported automatically with `TImportAll` in future sessions.
         * Aspects of the package other than simplification are not parallelized, since they are typically short calculations with few elements, and would not benefit from parallelization.
